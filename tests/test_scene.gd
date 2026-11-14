@@ -47,8 +47,13 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: Kenney character or holiday decoration did not load")
 		quit(1)
 		return true
+	var model: Node3D = game.get("walker_model")
+	if model.transform.basis.z.dot(Vector3.FORWARD) < 0.99:
+		printerr("FAIL: walker does not face the next tower")
+		quit(1)
+		return true
 	var pole: MeshInstance3D = game.get("pole")
-	if pole == null or not is_equal_approx(pole.position.y, 1.15) or not is_equal_approx(pole.position.z, 0.42) or absf(pole.transform.basis.y.x) < 0.95:
+	if pole == null or not is_equal_approx(pole.position.y, 1.15) or not is_equal_approx(pole.position.z, -0.42) or absf(pole.transform.basis.y.x) < 0.95:
 		printerr("FAIL: balance pole is not horizontal in front of the waist")
 		quit(1)
 		return true

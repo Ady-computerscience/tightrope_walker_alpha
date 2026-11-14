@@ -11,7 +11,7 @@ const ROPE_SEGMENTS := 26
 const ROPE_COLOR := Color("ecd6ac")
 const HOT_COLOR := Color("ff5c46")
 const POLE_WAIST_Y := 1.15
-const POLE_FRONT_Z := 0.42
+const POLE_FRONT_Z := -0.42
 const STORIES := [
 	"The wind has turned everyone back. Not tonight.",
 	"Even the birds doubt you. Let them watch you prove them wrong.",
@@ -393,6 +393,7 @@ func _build_walker_visual() -> void:
 			walker_model = scene.instantiate() as Node3D
 			if walker_model != null:
 				walker.add_child(walker_model)
+				walker_model.rotation.y = PI
 				walker_animation = walker_model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 				_play_walker_animation("idle")
 				return
