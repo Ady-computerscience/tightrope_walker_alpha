@@ -314,6 +314,7 @@ func _build_world() -> void:
 	var imported_world := _load_imported_world()
 	if not imported_world:
 		_build_fallback_towers()
+	_build_cityscape()
 	for number in range(1, Rules.TOWER_COUNT + 1):
 		var pieces: Array = []
 		for segment_number in ROPE_SEGMENTS:
@@ -482,6 +483,48 @@ func _build_fallback_towers() -> void:
 		_add_box(Vector3(0.0, FEET_Y - 0.4, z - 4.0), Vector3(13.0, 0.8, 12.0), Color("c78b5e"))
 		for x in [-5.0, 5.0]:
 			_add_box(Vector3(x, FEET_Y + 1.5, z - 4.0), Vector3(0.5, 3.5, 0.5), Color("f3c877"))
+
+
+func _build_cityscape() -> void:
+	var city := Node3D.new()
+	city.name = "Cityscape"
+	add_child(city)
+	var skyline_rng := RandomNumberGenerator.new()
+	skyline_rng.seed = 49021
+	var walls := [Color("252942"), Color("303149"), Color("36364d"), Color("292d46")]
+	var windows := [Color("f7ca76"), Color("e8a96b"), Color("a5bfd5")]
+	for side_index in 2:
+		var side := -1.0 if side_index == 0 else 1.0
+		for row in 2:
+			var distance := 49.0 + row * 28.0
+			for index in 25:
+				var z := 39.0 - index * 17.0 - row * 7.0
+				var height := skyline_rng.randf_range(22.0, 56.0) + row * 8.0
+				var width := skyline_rng.randf_range(12.0, 18.0)
+				var depth := skyline_rng.randf_range(11.0, 17.0)
+				var x := side * (distance + skyline_rng.randf_range(-4.0, 4.0))
+				var building := _city_box(city, Vector3(x, -12.0 + height * 0.5, z), Vector3(width, height, depth), walls[skyline_rng.randi_range(0, walls.size() - 1)])
+				building.name = "Building %d %d %d" % [int(side), row, index]
+				var inner_face := x - side * (width * 0.5 + 0.04)
+				for floor_number in range(2, int(height / 5.0)):
+					if skyline_rng.randf() < 0.28:
+						continue
+					for column in 2:
+						var pane_z := z + (float(column) - 0.5) * depth * 0.38
+						_city_box(city, Vector3(inner_face, -12.0 + floor_number * 5.0, pane_z), Vector3(0.12, 1.55, 1.2), windows[skyline_rng.randi_range(0, windows.size() - 1)], true)
+				if skyline_rng.randf() < 0.3:
+					_city_box(city, Vector3(x, -12.0 + height + 2.5, z), Vector3(0.25, 5.0, 0.25), Color("7c829e"))
+
+
+func _city_box(parent: Node3D, at: Vector3, size: Vector3, color: Color, unshaded: bool = false) -> MeshInstance3D:
+	var node := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	node.mesh = mesh
+	node.material_override = _material(color, unshaded)
+	node.position = at
+	parent.add_child(node)
+	return node
 
 
 func _add_box(at: Vector3, size: Vector3, color: Color) -> MeshInstance3D:

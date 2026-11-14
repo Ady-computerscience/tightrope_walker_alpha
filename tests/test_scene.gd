@@ -23,6 +23,11 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: world geometry was not built")
 		quit(1)
 		return true
+	var cityscape := game.get_node_or_null("Cityscape")
+	if cityscape == null or cityscape.get_child_count() < 100:
+		printerr("FAIL: cityscape background was not built")
+		quit(1)
+		return true
 	if game.get("walker_model") == null or game.get("walker_animation") == null or game.get("kenney_decor_count") < 15:
 		printerr("FAIL: Kenney character or holiday decoration did not load")
 		quit(1)
