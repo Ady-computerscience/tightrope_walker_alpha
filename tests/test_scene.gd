@@ -24,6 +24,52 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: W/O step or Q/P lean bindings are missing")
 		quit(1)
 		return true
+	var hud: GameHUD = game.get("hud")
+	var hint: PanelContainer = hud.get("_control_hint")
+	if hint == null or not hint.visible or not is_equal_approx(hint.anchor_top, 1.0):
+		printerr("FAIL: control hint is not visible at the bottom on startup")
+		quit(1)
+		return true
+	hud.call("_process", 30.0)
+	if not hint.visible:
+		printerr("FAIL: startup control hint expired before the first step")
+		quit(1)
+		return true
+	game.set("mode", "walking")
+	var startup_rules: TightropeRules = game.get("rules")
+	startup_rules.last_step_at = startup_rules.time
+	game.call("_step", "left")
+	if game.get("has_taken_first_step"):
+		printerr("FAIL: cooldown press started control hint countdown")
+		quit(1)
+		return true
+	startup_rules.last_step_at = -10.0
+	game.call("_step", "left")
+	if not game.get("has_taken_first_step") or startup_rules.step != 1:
+		printerr("FAIL: first successful step did not start control hint countdown")
+		quit(1)
+		return true
+	hud.call("_process", 9.9)
+	if not hint.visible:
+		printerr("FAIL: control hint hid before ten seconds after first step")
+		quit(1)
+		return true
+	hud.call("_process", 0.2)
+	if hint.visible:
+		printerr("FAIL: control hint did not hide after ten seconds from first step")
+		quit(1)
+		return true
+	hud.call("_process", 30.0)
+	if hint.visible:
+		printerr("FAIL: control hint reappeared without a restart")
+		quit(1)
+		return true
+	game.call("_restart")
+	hud.call("_process", 11.0)
+	if not hint.visible or game.get("has_taken_first_step"):
+		printerr("FAIL: restarted round did not wait for its first step")
+		quit(1)
+		return true
 	var towers := game.get_node_or_null("Rooftop Skyscrapers")
 	if towers == null or towers.get_child_count() != 5:
 		printerr("FAIL: five rooftop skyscrapers were not built")
@@ -85,11 +131,20 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	game.call("_restart")
+	if not hint.visible or game.get("has_taken_first_step"):
+		printerr("FAIL: control hint did not reset after restart")
+		quit(1)
+		return true
 	var run: TightropeRules = game.get("rules")
 	run.step = Rules.STEPS_PER_TOWER - 1
 	game.call("_step", "left")
 	if run.tower != 2 or run.checkpoint_tower != 1:
 		printerr("FAIL: next tower became checkpoint before landing")
+		quit(1)
+		return true
+	hud.call("_process", 10.1)
+	if hint.visible:
+		printerr("FAIL: restarted control hint did not expire after its first step")
 		quit(1)
 		return true
 	game.call("_update_step", 1.0)
@@ -108,6 +163,11 @@ func _process(_delta: float) -> bool:
 		game.call("_process", 0.1)
 	if run.state != "walking" or run.tower != 2 or not is_equal_approx(game.get("visual_z"), Rules.step_z(2, 0)):
 		printerr("FAIL: fall did not respawn on last reached rooftop: state=%s tower=%d z=%f elapsed=%f" % [run.state, run.tower, game.get("visual_z"), game.get("fall_elapsed")])
+		quit(1)
+		return true
+	hud.call("_process", 11.0)
+	if hint.visible or not game.get("has_taken_first_step"):
+		printerr("FAIL: control hint reappeared after fall respawn")
 		quit(1)
 		return true
 	print("PASS: main scene initializes and step action works")

@@ -37,6 +37,7 @@ var step_elapsed := 0.0
 var step_duration := 0.0
 var step_result := ""
 var last_step_foot := ""
+var has_taken_first_step := false
 var fall_elapsed := 0.0
 var intro_elapsed := 0.0
 var outro_elapsed := 0.0
@@ -60,6 +61,7 @@ func _ready() -> void:
 	hud.stargaze_requested.connect(_stargaze)
 	hud.pause_requested.connect(_toggle_pause)
 	hud.show_caption("Beyond the horizon, the stars gather every night.")
+	hud.show_control_hint()
 
 
 func _process(delta: float) -> void:
@@ -124,6 +126,9 @@ func _step(foot: String = "") -> void:
 	var result := rules.try_step()
 	if result == "blocked" or result == "cooldown":
 		return
+	if not has_taken_first_step:
+		has_taken_first_step = true
+		hud.start_control_hint_countdown()
 	if foot.is_empty():
 		foot = "right" if last_step_foot == "left" else "left"
 	last_step_foot = foot
@@ -151,12 +156,14 @@ func _restart() -> void:
 	rules = Rules.new()
 	visual_z = Rules.step_z(1, 0)
 	last_step_foot = ""
+	has_taken_first_step = false
 	_play_walker_animation("idle")
 	step_duration = 0.0
 	fall_elapsed = 0.0
 	hud.set_paused(false)
 	hud.hide_win()
 	hud.show_caption("")
+	hud.show_control_hint()
 	_announce_tower()
 
 

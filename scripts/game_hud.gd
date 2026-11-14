@@ -11,6 +11,7 @@ const GOLD := Color("ffca62")
 const CORAL := Color("ff6a58")
 const MINT := Color("7ee8ac")
 const PANEL := Color("2c182e")
+const CONTROL_HINT_SECONDS := 10.0
 
 var _progress: Label
 var _stage: Label
@@ -21,10 +22,31 @@ var _toast: Label
 var _win: PanelContainer
 var _win_text: Label
 var _paused: PanelContainer
+var _control_hint: PanelContainer
+var _control_hint_elapsed := 0.0
+var _hint_countdown_started := false
 
 
 func _ready() -> void:
 	_build()
+
+
+func _process(delta: float) -> void:
+	if _control_hint.visible and _hint_countdown_started:
+		_control_hint_elapsed += delta
+		if _control_hint_elapsed >= CONTROL_HINT_SECONDS:
+			_control_hint.hide()
+
+
+func show_control_hint() -> void:
+	_control_hint.show()
+	_control_hint_elapsed = 0.0
+	_hint_countdown_started = false
+
+
+func start_control_hint_countdown() -> void:
+	_hint_countdown_started = true
+	_control_hint_elapsed = 0.0
 
 
 func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, cue: String) -> void:
@@ -70,7 +92,7 @@ func _build() -> void:
 
 	var top := PanelContainer.new()
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	top.offset_bottom = 134.0
+	top.offset_bottom = 108.0
 	top.add_theme_stylebox_override("panel", _panel_style())
 	root.add_child(top)
 	var top_box := VBoxContainer.new()
@@ -87,9 +109,21 @@ func _build() -> void:
 	_balance.show_percentage = false
 	_balance.custom_minimum_size = Vector2(0, 12)
 	top_box.add_child(_balance)
-	top_box.add_child(_label("W / O: left / right foot   •   Q / P: lean left / right", 14, CREAM))
 	_cue = _label("Keep the pole level", 14, CREAM)
 	top_box.add_child(_cue)
+
+	_control_hint = PanelContainer.new()
+	_control_hint.name = "Control Hint"
+	_control_hint.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_control_hint.offset_top = -70.0
+	_control_hint.offset_bottom = -12.0
+	_control_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_control_hint.add_theme_stylebox_override("panel", _panel_style())
+	root.add_child(_control_hint)
+	var hint_text := _label("W / O: left / right foot   •   Q / P: lean left / right   •   Space: release", 20, CREAM)
+	hint_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_control_hint.add_child(hint_text)
+	_control_hint.hide()
 
 	_caption = _label("", 22, CREAM)
 	_caption.set_anchors_preset(Control.PRESET_CENTER_TOP)
