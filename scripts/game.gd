@@ -21,6 +21,9 @@ var rules: TightropeRules
 var hud: GameHUD
 var camera: Camera3D
 var walker: Node3D
+var walker_model: Node3D
+var walker_animation: AnimationPlayer
+var kenney_decor_count := 0
 var pole: MeshInstance3D
 var ropes: Array = []
 var birds: Array[MeshInstance3D] = []
@@ -97,11 +100,14 @@ func _process(delta: float) -> void:
 						fall_elapsed = 0.0
 						step_duration = 0.0
 						hud.show_toast("You fell: %s" % event["reason"])
+						if walker_animation != null and walker_animation.has_animation("die"):
+							walker_animation.play("die")
 			if rules.state == "falling":
 				fall_elapsed += dt
 				if fall_elapsed >= 1.7:
 					rules.respawn()
 					visual_z = Rules.step_z(rules.tower, 0)
+					_play_walker_animation("idle")
 					_announce_tower("Try again")
 	_update_step(dt)
 	_update_walker(dt)
@@ -125,6 +131,7 @@ func _step() -> void:
 	step_duration = 0.6 if absf(step_to - step_from) > 8.0 else 0.4
 	step_elapsed = 0.0
 	step_result = result
+	_play_walker_animation("walk")
 
 
 func _release() -> void:
@@ -137,6 +144,7 @@ func _restart() -> void:
 	mode = "walking"
 	rules = Rules.new()
 	visual_z = Rules.step_z(1, 0)
+	_play_walker_animation("idle")
 	step_duration = 0.0
 	fall_elapsed = 0.0
 	hud.set_paused(false)
@@ -176,6 +184,7 @@ func _update_step(dt: float) -> void:
 	visual_z = lerpf(step_from, step_to, eased)
 	if progress >= 1.0:
 		step_duration = 0.0
+		_play_walker_animation("idle")
 		if step_result == "tower":
 			_announce_tower()
 		elif step_result == "won":
@@ -323,22 +332,8 @@ func _build_world() -> void:
 		floor_mesh.name = "Safety Ground"
 	walker = Node3D.new()
 	add_child(walker)
-	var body := MeshInstance3D.new()
-	var capsule := CapsuleMesh.new()
-	capsule.radius = 0.65
-	capsule.height = 3.0
-	body.mesh = capsule
-	body.material_override = _material(Color("ffca62"))
-	body.position.y = 1.5
-	walker.add_child(body)
-	var head := MeshInstance3D.new()
-	var sphere := SphereMesh.new()
-	sphere.radius = 0.6
-	sphere.height = 1.2
-	head.mesh = sphere
-	head.material_override = _material(Color("ffe2bd"))
-	head.position.y = 3.2
-	walker.add_child(head)
+	_build_walker_visual()
+	_place_kenney_decor()
 	pole = MeshInstance3D.new()
 	var pole_mesh := CylinderMesh.new()
 	pole_mesh.top_radius = 0.11
@@ -382,6 +377,72 @@ func _build_world() -> void:
 		star.material_override = _material(Color("fff4d8"), true)
 		star.position = Vector3(_rng.randf_range(-180.0, 180.0), _rng.randf_range(28.0, 90.0), _rng.randf_range(-340.0, 60.0))
 		add_child(star)
+
+
+func _build_walker_visual() -> void:
+	var path := "res://assets/kenney/blocky_characters/character-a.glb"
+	if ResourceLoader.exists(path):
+		var scene := load(path) as PackedScene
+		if scene != null:
+			walker_model = scene.instantiate() as Node3D
+			if walker_model != null:
+				walker.add_child(walker_model)
+				walker_animation = walker_model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+				_play_walker_animation("idle")
+				return
+	# Keep a visible walker if an asset is missing from a development checkout.
+	var body := MeshInstance3D.new()
+	var capsule := CapsuleMesh.new()
+	capsule.radius = 0.65
+	capsule.height = 3.0
+	body.mesh = capsule
+	body.material_override = _material(Color("ffca62"))
+	body.position.y = 1.5
+	walker.add_child(body)
+	var head := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.6
+	sphere.height = 1.2
+	head.mesh = sphere
+	head.material_override = _material(Color("ffe2bd"))
+	head.position.y = 3.2
+	walker.add_child(head)
+
+
+func _play_walker_animation(animation_name: StringName) -> void:
+	if walker_animation != null and walker_animation.has_animation(animation_name):
+		walker_animation.play(animation_name)
+
+
+func _place_kenney_decor() -> void:
+	var decorations := Node3D.new()
+	decorations.name = "Kenney Holiday Decorations"
+	add_child(decorations)
+	for tower_number in range(1, Rules.TOWER_COUNT + 2):
+		var z := Rules.tower_z(tower_number)
+		_add_kenney_model(decorations, "tree-snow-a", Vector3(-5.1, FEET_Y - 0.7, z - 1.0), 1.6)
+		_add_kenney_model(decorations, "tree-snow-b", Vector3(5.1, FEET_Y - 0.7, z - 1.0), 1.5)
+		_add_kenney_model(decorations, "lantern", Vector3(-4.0, FEET_Y - 0.7, z - 7.0), 1.1)
+	_add_kenney_model(decorations, "snowman-hat", Vector3(3.8, FEET_Y - 0.7, Rules.tower_z(1) + 1.0), 1.5)
+	_add_kenney_model(decorations, "bench", Vector3(-3.8, FEET_Y - 0.7, Rules.tower_z(5) - 4.0), 1.7)
+	for x in [-2.8, 2.8]:
+		_add_kenney_model(decorations, "present-a-cube", Vector3(x, FEET_Y - 0.7, Rules.tower_z(5) - 5.5), 1.3)
+
+
+func _add_kenney_model(parent: Node3D, model_name: String, at: Vector3, model_scale: float) -> void:
+	var path := "res://assets/kenney/holiday_kit/%s.glb" % model_name
+	if not ResourceLoader.exists(path):
+		return
+	var scene := load(path) as PackedScene
+	if scene == null:
+		return
+	var instance := scene.instantiate() as Node3D
+	if instance == null:
+		return
+	instance.position = at
+	instance.scale = Vector3.ONE * model_scale
+	parent.add_child(instance)
+	kenney_decor_count += 1
 
 
 func _load_imported_world() -> bool:

@@ -23,9 +23,13 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: world geometry was not built")
 		quit(1)
 		return true
+	if game.get("walker_model") == null or game.get("walker_animation") == null or game.get("kenney_decor_count") < 15:
+		printerr("FAIL: Kenney character or holiday decoration did not load")
+		quit(1)
+		return true
 	game.set("mode", "walking")
 	game.call("_step")
-	if game.get("rules").step != 1:
+	if game.get("rules").step != 1 or game.get("walker_animation").current_animation != "walk":
 		printerr("FAIL: scene step input did not advance rules")
 		quit(1)
 		return true
