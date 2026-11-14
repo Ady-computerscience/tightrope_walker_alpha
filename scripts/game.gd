@@ -102,13 +102,13 @@ func _process(delta: float) -> void:
 						hud.show_toast("You fell: %s" % event["reason"])
 						if walker_animation != null and walker_animation.has_animation("die"):
 							walker_animation.play("die")
-			if rules.state == "falling":
-				fall_elapsed += dt
-				if fall_elapsed >= 1.7:
-					rules.respawn()
-					visual_z = Rules.step_z(rules.tower, 0)
-					_play_walker_animation("idle")
-					_announce_tower("Try again")
+		if rules.state == "falling":
+			fall_elapsed += dt
+			if fall_elapsed >= 1.7:
+				rules.respawn()
+				visual_z = Rules.step_z(rules.tower, 0)
+				_play_walker_animation("idle")
+				_announce_tower("Try again")
 	_update_step(dt)
 	_update_walker(dt)
 	_update_birds()
@@ -195,6 +195,7 @@ func _update_step(dt: float) -> void:
 		step_duration = 0.0
 		_play_walker_animation("idle")
 		if step_result == "tower":
+			rules.reach_tower()
 			_announce_tower()
 		elif step_result == "won":
 			best_time = minf(best_time, rules.finish_time)

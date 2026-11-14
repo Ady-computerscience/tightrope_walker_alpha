@@ -8,6 +8,7 @@ var failures: Array[String] = []
 func _initialize() -> void:
 	_test_path()
 	_test_steps_and_checkpoints()
+	_test_checkpoint_respawn()
 	_test_birds()
 	_test_tension()
 	_test_sway()
@@ -48,12 +49,46 @@ func _test_steps_and_checkpoints() -> void:
 		if index == 7:
 			_check(result == "tower" and run.tower == 2 and run.step == 0, "nine steps reach tower two")
 	run.tower = 3
+	run.checkpoint_tower = 3
 	run.tilt = 0.99
 	run.tilt_vel = 2.0
 	var events := run.update(1.0 / 60.0, 0.0)
 	_check(run.state == "falling" and events.back().get("type") == "fall", "balance fall fires event")
 	run.respawn()
 	_check(run.state == "walking" and run.tower == 3 and run.step == 0, "fall restarts same tower")
+
+
+func _test_checkpoint_respawn() -> void:
+	var run := Rules.new(13)
+	for reached in range(1, Rules.TOWER_COUNT + 1):
+		_check(run.tower == reached and run.checkpoint_tower == reached, "tower %d is the active checkpoint" % reached)
+		run.try_step()
+		_force_balance_fall(run)
+		run.respawn()
+		_check(run.tower == reached and run.step == 0, "fall before next tower respawns at tower %d" % reached)
+		if reached == Rules.TOWER_COUNT:
+			break
+		for attempt in 2:
+			for step_number in Rules.STEPS_PER_TOWER:
+				run.time += 0.5
+				var result := run.try_step()
+				if step_number == Rules.STEPS_PER_TOWER - 1:
+					_check(result == "tower" and run.tower == reached + 1, "tower %d transition begins" % reached)
+			if attempt == 0:
+				_check(run.checkpoint_tower == reached, "checkpoint waits for landing on tower %d" % (reached + 1))
+				_force_balance_fall(run)
+				run.respawn()
+				_check(run.tower == reached, "fall during landing returns to tower %d" % reached)
+			else:
+				run.reach_tower()
+				_check(run.checkpoint_tower == reached + 1, "landing saves tower %d checkpoint" % (reached + 1))
+
+
+func _force_balance_fall(run: TightropeRules) -> void:
+	run.tilt = 0.99
+	run.tilt_vel = 2.0
+	var events := run.update(1.0 / 60.0, 0.0)
+	_check(run.state == "falling" and events.back().get("type") == "fall", "balance fall triggers for checkpoint test")
 
 
 func _test_birds() -> void:
@@ -127,6 +162,8 @@ func _test_full_run(seed_value: int) -> void:
 			var result := run.try_step()
 			if result != "cooldown":
 				since_step = 0.0
+			if result == "tower":
+				run.reach_tower()
 			if result == "won":
 				_check(run.state == "won" and run.tower == 4, "seed %d win state" % seed_value)
 				return

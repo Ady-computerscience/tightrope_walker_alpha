@@ -1,6 +1,7 @@
 extends SceneTree
 ## Smoke test for scene construction, HUD, and gameplay wiring.
 
+const Rules := preload("res://scripts/tightrope_rules.gd")
 var frames := 0
 
 
@@ -81,6 +82,32 @@ func _process(_delta: float) -> bool:
 	game.call("_step")
 	if game.get("rules").step != 3 or game.get("last_step_foot") != "left":
 		printerr("FAIL: generic step did not alternate feet")
+		quit(1)
+		return true
+	game.call("_restart")
+	var run: TightropeRules = game.get("rules")
+	run.step = Rules.STEPS_PER_TOWER - 1
+	game.call("_step", "left")
+	if run.tower != 2 or run.checkpoint_tower != 1:
+		printerr("FAIL: next tower became checkpoint before landing")
+		quit(1)
+		return true
+	game.call("_update_step", 1.0)
+	if run.checkpoint_tower != 2:
+		printerr("FAIL: landing did not save tower two checkpoint")
+		quit(1)
+		return true
+	run.tilt = 0.99
+	run.tilt_vel = 2.0
+	run.update(1.0 / 60.0, 0.0)
+	if run.state != "falling":
+		printerr("FAIL: checkpoint test did not trigger a fall")
+		quit(1)
+		return true
+	for tick in 18:
+		game.call("_process", 0.1)
+	if run.state != "walking" or run.tower != 2 or not is_equal_approx(game.get("visual_z"), Rules.step_z(2, 0)):
+		printerr("FAIL: fall did not respawn on last reached rooftop: state=%s tower=%d z=%f elapsed=%f" % [run.state, run.tower, game.get("visual_z"), game.get("fall_elapsed")])
 		quit(1)
 		return true
 	print("PASS: main scene initializes and step action works")

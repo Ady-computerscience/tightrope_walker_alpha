@@ -29,6 +29,7 @@ const SWAY_SHOVE := 1.4
 const STAGES := ["Wind", "Birds", "Tension", "Sway"]
 
 var tower := 1
+var checkpoint_tower := 1
 var step := 0
 var state := "walking"
 var time := 0.0
@@ -194,10 +195,16 @@ func release() -> String:
 
 
 func respawn() -> int:
+	tower = checkpoint_tower
 	_reset_stage()
 	state = "walking"
 	fall_reason = ""
 	return tower
+
+
+func reach_tower() -> void:
+	if state == "walking" and step == 0:
+		checkpoint_tower = tower
 
 
 func _fall(reason: String, events: Array[Dictionary], direction: int = 0) -> void:
