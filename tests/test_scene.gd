@@ -33,7 +33,7 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: city street and sidewalks were not built")
 		quit(1)
 		return true
-	if game.get("walker_model") == null or game.get("walker_animation") == null or game.get("kenney_decor_count") < 15:
+	if game.get("walker_model") == null or game.get("walker_animation") == null or game.get("kenney_decor_count") != 8:
 		printerr("FAIL: Kenney character or holiday decoration did not load")
 		quit(1)
 		return true
