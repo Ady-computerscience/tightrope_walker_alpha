@@ -3,8 +3,8 @@ extends Node3D
 
 const Rules := preload("res://scripts/tightrope_rules.gd")
 const HudScene := preload("res://scripts/game_hud.gd")
-const FEET_Y := 5.0
-const ROPE_Y := 4.87
+const FEET_Y := 45.0
+const ROPE_Y := 44.87
 const STATIC_SAG := 0.25
 const LOAD_SAG := 0.9
 const ROPE_SEGMENTS := 26
@@ -42,7 +42,6 @@ var paused := false
 var touch_left := false
 var touch_right := false
 var best_time := INF
-var imported_art_count := 0
 var camera_position := Vector3.ZERO
 var camera_look := Vector3.ZERO
 var _rng := RandomNumberGenerator.new()
@@ -264,12 +263,12 @@ func _update_camera(dt: float) -> void:
 	var desired_look := focus + Vector3(0.0, 1.0, -12.0)
 	if mode == "intro":
 		var progress := clampf(intro_elapsed / 9.2, 0.0, 1.0)
-		desired_position = Vector3(18.0, 24.0, -250.0).lerp(desired_position, progress)
-		desired_look = Vector3(0.0, 12.0, -270.0).lerp(desired_look, progress)
+		desired_position = Vector3(18.0, 64.0, -250.0).lerp(desired_position, progress)
+		desired_look = Vector3(0.0, 52.0, -270.0).lerp(desired_look, progress)
 	elif mode == "outro" or mode == "stargaze":
 		var progress := clampf(outro_elapsed / 13.0, 0.0, 1.0)
-		desired_position = focus.lerp(Vector3(0.0, 38.0, -260.0), progress)
-		desired_look = focus.lerp(Vector3(0.0, 70.0, -300.0), progress)
+		desired_position = focus.lerp(Vector3(0.0, 78.0, -260.0), progress)
+		desired_look = focus.lerp(Vector3(0.0, 110.0, -300.0), progress)
 	var amount := 1.0 - exp(-dt * 3.5)
 	camera_position = camera_position.lerp(desired_position, amount)
 	camera_look = camera_look.lerp(desired_look, amount)
@@ -311,9 +310,7 @@ func _build_world() -> void:
 	camera.current = true
 	camera.fov = 68.0
 	add_child(camera)
-	var imported_world := _load_imported_world()
-	if not imported_world:
-		_build_fallback_towers()
+	_build_rooftop_skyscrapers()
 	_build_cityscape()
 	_build_city_ground()
 	for number in range(1, Rules.TOWER_COUNT + 1):
@@ -374,7 +371,7 @@ func _build_world() -> void:
 		star_mesh.height = 0.26
 		star.mesh = star_mesh
 		star.material_override = _material(Color("fff4d8"), true)
-		star.position = Vector3(_rng.randf_range(-180.0, 180.0), _rng.randf_range(28.0, 90.0), _rng.randf_range(-340.0, 60.0))
+		star.position = Vector3(_rng.randf_range(-180.0, 180.0), _rng.randf_range(68.0, 130.0), _rng.randf_range(-340.0, 60.0))
 		add_child(star)
 
 
@@ -441,43 +438,42 @@ func _add_kenney_model(parent: Node3D, model_name: String, at: Vector3, model_sc
 	kenney_decor_count += 1
 
 
-func _load_imported_world() -> bool:
-	var loaded := false
-	for index in range(1, 22):
-		var path := "res://assets/world/HighwireHorizon_%02d.obj" % index
-		if not ResourceLoader.exists(path):
-			continue
-		var mesh := load(path) as Mesh
-		if mesh == null or mesh.get_surface_count() == 0:
-			continue
-		var visual := MeshInstance3D.new()
-		visual.mesh = mesh
-		visual.position.y = -50.38
-		add_child(visual)
-		imported_art_count += 1
-		loaded = true
-	for name in ["Terrain", "DesertFloor", "Mountain"]:
-		var path := "res://assets/world/%s.obj" % name
-		if not ResourceLoader.exists(path):
-			continue
-		var mesh := load(path) as Mesh
-		if mesh == null or mesh.get_surface_count() == 0:
-			continue
-		var visual := MeshInstance3D.new()
-		visual.mesh = mesh
-		visual.position.y = -50.38
-		add_child(visual)
-		imported_art_count += 1
-	return loaded
-
-
-func _build_fallback_towers() -> void:
+func _build_rooftop_skyscrapers() -> void:
+	var towers := Node3D.new()
+	towers.name = "Rooftop Skyscrapers"
+	add_child(towers)
+	var facade_colors := [Color("303149"), Color("292d46"), Color("36364d"), Color("252942"), Color("303149")]
+	var glass_colors := [Color("a5bfd5"), Color("f7ca76"), Color("e8a96b"), Color("596c8c")]
+	var roof_y := FEET_Y - 0.5
+	var height := roof_y + 12.0
 	for number in range(1, Rules.TOWER_COUNT + 2):
-		var z := Rules.tower_z(number)
-		_add_box(Vector3(0.0, -1.5, z - 4.0), Vector3(10.0, 12.0, 10.0), Color("6b3e40"))
-		_add_box(Vector3(0.0, FEET_Y - 0.4, z - 4.0), Vector3(13.0, 0.8, 12.0), Color("c78b5e"))
-		for x in [-5.0, 5.0]:
-			_add_box(Vector3(x, FEET_Y + 1.5, z - 4.0), Vector3(0.5, 3.5, 0.5), Color("f3c877"))
+		var tower := Node3D.new()
+		tower.name = "Skyscraper %d" % number
+		tower.position.z = Rules.tower_z(number) - 4.0
+		towers.add_child(tower)
+		var facade: Color = facade_colors[number - 1]
+		var trim := facade.lightened(0.25)
+		_city_box(tower, Vector3(0.0, -12.0 + height * 0.5, 0.0), Vector3(17.0, height, 20.0), facade)
+		var roof := _city_box(tower, Vector3(0.0, roof_y - 0.2, 0.0), Vector3(19.0, 0.4, 24.0), Color("55586c"))
+		roof.name = "Walkable Roof"
+		for side in [-1.0, 1.0]:
+			_city_box(tower, Vector3(side * 9.2, roof_y + 0.45, 0.0), Vector3(0.5, 1.3, 24.0), trim)
+			_city_box(tower, Vector3(side * 8.55, 15.0, 0.0), Vector3(0.25, 49.0, 0.35), trim)
+			for column in 3:
+				_city_box(tower, Vector3(side * 8.56, 16.0, (float(column) - 1.0) * 6.0), Vector3(0.16, 45.0, 0.16), trim)
+			_city_box(tower, Vector3(side * 6.0, roof_y + 0.75, 1.0), Vector3(2.4, 1.5, 2.8), Color("41485c"))
+		for floor_number in 11:
+			var y := -7.0 + floor_number * 4.5
+			if floor_number % 3 == 0:
+				_city_box(tower, Vector3(0.0, y - 1.9, 0.0), Vector3(17.5, 0.25, 20.5), trim)
+			for column in 3:
+				var offset := (float(column) - 1.0) * 5.0
+				var glass: Color = glass_colors[(number + floor_number + column) % glass_colors.size()]
+				for side in [-1.0, 1.0]:
+					_city_box(tower, Vector3(offset, y, side * 10.04), Vector3(2.8, 2.2, 0.12), glass, true)
+					_city_box(tower, Vector3(side * 8.54, y, offset * 1.25), Vector3(0.12, 2.2, 2.8), glass, true)
+		if number == Rules.TOWER_COUNT + 1:
+			_city_box(tower, Vector3(6.5, roof_y + 3.0, 6.5), Vector3(0.3, 6.0, 0.3), Color("a5bfd5"))
 
 
 func _build_cityscape() -> void:
@@ -535,17 +531,6 @@ func _city_box(parent: Node3D, at: Vector3, size: Vector3, color: Color, unshade
 	node.material_override = _material(color, unshaded)
 	node.position = at
 	parent.add_child(node)
-	return node
-
-
-func _add_box(at: Vector3, size: Vector3, color: Color) -> MeshInstance3D:
-	var node := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	node.mesh = mesh
-	node.material_override = _material(color)
-	node.position = at
-	add_child(node)
 	return node
 
 

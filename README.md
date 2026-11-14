@@ -1,6 +1,6 @@
 # Tightrope Walker — Godot port
 
-A Godot 4.7 single-player port of the supplied Roblox game. The balance and stage rules are ported from `TightropeRules.luau`; the main scene uses Kenney’s animated Blocky Character as the walker and Holiday Kit models as winter decorations, alongside reactive ropes, HUD, snow, birds, and camera. The original exported world OBJ has been split into 21 parts because Godot limits the number of surfaces in one mesh. The OBJ and PNG assets remain editable in `assets/world`.
+A Godot 4.7 single-player port of the supplied Roblox game. The balance and stage rules are ported from `TightropeRules.luau`; the main scene uses Kenney’s animated Blocky Character as the walker and Holiday Kit models as winter decorations, alongside reactive ropes, HUD, snow, birds, and camera. The playable course now uses five detailed rooftop skyscrapers above a city street. The original exported world OBJ and PNG assets remain in `assets/world` as source material.
 
 ## Play
 
@@ -18,7 +18,7 @@ godot --headless --path . --script res://tests/test_rules.gd
 godot --headless --path . --script res://tests/test_scene.gd
 ```
 
-The rules test covers path layout, cooldowns, tower transitions, checkpoint behavior, birds, tension, sway, deterministic seeds, and two full successful runs. The scene test checks world import, HUD creation, and step wiring.
+The rules test covers path layout, cooldowns, tower transitions, checkpoint behavior, birds, tension, sway, deterministic seeds, and two full successful runs. The scene test checks skyscraper construction, HUD creation, and step wiring.
 
 ## Source and current limits
 

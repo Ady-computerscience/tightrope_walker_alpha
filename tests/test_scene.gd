@@ -19,10 +19,16 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: game scene did not initialize")
 		quit(1)
 		return true
-	if game.get_child_count() < 100 or game.get("imported_art_count") < 21:
-		printerr("FAIL: world geometry was not built")
+	var towers := game.get_node_or_null("Rooftop Skyscrapers")
+	if towers == null or towers.get_child_count() != 5:
+		printerr("FAIL: five rooftop skyscrapers were not built")
 		quit(1)
 		return true
+	for tower in towers.get_children():
+		if tower.get_node_or_null("Walkable Roof") == null or tower.get_child_count() < 100:
+			printerr("FAIL: skyscraper roof or facade detail is missing")
+			quit(1)
+			return true
 	var cityscape := game.get_node_or_null("Cityscape")
 	if cityscape == null or cityscape.get_child_count() < 100:
 		printerr("FAIL: cityscape background was not built")
