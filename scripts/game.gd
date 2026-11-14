@@ -315,6 +315,7 @@ func _build_world() -> void:
 	if not imported_world:
 		_build_fallback_towers()
 	_build_cityscape()
+	_build_city_ground()
 	for number in range(1, Rules.TOWER_COUNT + 1):
 		var pieces: Array = []
 		for segment_number in ROPE_SEGMENTS:
@@ -328,9 +329,6 @@ func _build_world() -> void:
 			add_child(segment)
 			pieces.append(segment)
 		ropes.append(pieces)
-	if not imported_world:
-		var floor_mesh := _add_box(Vector3(0.0, -11.0, -124.0), Vector3(400.0, 1.0, 400.0), Color("281f35"))
-		floor_mesh.name = "Safety Ground"
 	walker = Node3D.new()
 	add_child(walker)
 	_build_walker_visual()
@@ -514,6 +512,22 @@ func _build_cityscape() -> void:
 						_city_box(city, Vector3(inner_face, -12.0 + floor_number * 5.0, pane_z), Vector3(0.12, 1.55, 1.2), windows[skyline_rng.randi_range(0, windows.size() - 1)], true)
 				if skyline_rng.randf() < 0.3:
 					_city_box(city, Vector3(x, -12.0 + height + 2.5, z), Vector3(0.25, 5.0, 0.25), Color("7c829e"))
+
+
+func _build_city_ground() -> void:
+	var ground := Node3D.new()
+	ground.name = "City Ground"
+	add_child(ground)
+	var street := _city_box(ground, Vector3(0.0, -12.5, -190.0), Vector3(78.0, 1.0, 500.0), Color("252a39"))
+	street.name = "Asphalt Street"
+	for side_index in 2:
+		var side := -1.0 if side_index == 0 else 1.0
+		var sidewalk := _city_box(ground, Vector3(side * 42.0, -12.25, -190.0), Vector3(8.0, 1.5, 500.0), Color("51566b"))
+		sidewalk.name = "Sidewalk %d" % side_index
+		_city_box(ground, Vector3(side * 38.0, -11.7, -190.0), Vector3(0.6, 0.3, 500.0), Color("9a9bae"))
+		for index in 27:
+			var z := 49.0 - index * 18.0
+			_city_box(ground, Vector3(side * 13.0, -11.97, z), Vector3(0.35, 0.06, 7.0), Color("d4b77b"), true)
 
 
 func _city_box(parent: Node3D, at: Vector3, size: Vector3, color: Color, unshaded: bool = false) -> MeshInstance3D:
