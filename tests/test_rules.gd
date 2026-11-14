@@ -9,6 +9,7 @@ func _initialize() -> void:
 	_test_path()
 	_test_steps_and_checkpoints()
 	_test_checkpoint_respawn()
+	_test_wind_disabled()
 	_test_birds()
 	_test_tension()
 	_test_sway()
@@ -89,6 +90,17 @@ func _force_balance_fall(run: TightropeRules) -> void:
 	run.tilt_vel = 2.0
 	var events := run.update(1.0 / 60.0, 0.0)
 	_check(run.state == "falling" and events.back().get("type") == "fall", "balance fall triggers for checkpoint test")
+
+
+func _test_wind_disabled() -> void:
+	var run := Rules.new(8)
+	_check(run.stage_kind() == "Balance", "tower one uses balance while wind is disabled")
+	for tick in 120:
+		for event in run.update(0.1, 0.0):
+			_check(event["type"] != "gust", "disabled wind emitted a gust at tick %d" % tick)
+		if run.state == "falling":
+			run.respawn()
+		_check(is_zero_approx(run.wind_ramp) and is_equal_approx(run.wind_timer, 0.6), "disabled wind changed its timer or ramp at tick %d" % tick)
 
 
 func _test_birds() -> void:

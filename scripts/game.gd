@@ -13,7 +13,7 @@ const HOT_COLOR := Color("ff5c46")
 const POLE_WAIST_Y := 1.15
 const POLE_FRONT_Z := -0.42
 const STORIES := [
-	"The wind has turned everyone back. Not tonight.",
+	"The skyline waits ahead. Find your balance and take the first step.",
 	"Even the birds doubt you. Let them watch you prove them wrong.",
 	"Halfway across. The rope knows your weight now.",
 	"One last sway. The stars are leaning in to see.",
@@ -288,7 +288,7 @@ func _update_camera(dt: float) -> void:
 
 
 func _update_hud() -> void:
-	var cue := "Space: release tension"
+	var cue := "Keep the pole level"
 	match rules.stage_kind():
 		"Wind": cue = "Wind: %s  %.0f%%" % ["RIGHT" if rules.wind_dir > 0 else "LEFT", rules.wind_ramp * 100.0]
 		"Birds": cue = "Birds: lean %s" % ["RIGHT" if rules.bird_dir > 0 else "LEFT"] if rules.bird_phase == "warn" else "Watch for the birds"

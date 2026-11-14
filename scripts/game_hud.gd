@@ -88,7 +88,7 @@ func _build() -> void:
 	_balance.custom_minimum_size = Vector2(0, 12)
 	top_box.add_child(_balance)
 	top_box.add_child(_label("W / O: left / right foot   •   Q / P: lean left / right", 14, CREAM))
-	_cue = _label("Space: release tension", 14, CREAM)
+	_cue = _label("Keep the pole level", 14, CREAM)
 	top_box.add_child(_cue)
 
 	_caption = _label("", 22, CREAM)

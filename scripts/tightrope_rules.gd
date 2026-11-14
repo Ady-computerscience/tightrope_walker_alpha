@@ -13,6 +13,7 @@ const LEAN_POWER := 1.6
 const DAMPING := 1.8
 const LEAN_SMOOTHING := 6.0
 const WOBBLE := 0.28
+const WIND_ENABLED := false
 const WIND_PUSH := 0.9
 const WIND_RAMP_TIME := 1.2
 const BIRD_WARN := 2.2
@@ -88,6 +89,8 @@ static func rope_at(z: float) -> Dictionary:
 
 
 func stage_kind() -> String:
+	if tower == 1 and not WIND_ENABLED:
+		return "Balance"
 	return STAGES[tower - 1]
 
 
