@@ -33,10 +33,40 @@ func _process(_delta: float) -> bool:
 			return true
 	var bird_rules: TightropeRules = game.get("rules")
 	bird_rules.tower = 2
-	bird_rules.bird_phase = "warn"
+	bird_rules.bird_phase = "approach"
+	bird_rules.bird_timer = Rules.BIRD_APPROACH
+	bird_rules.bird_entry_side = 1
 	bird_rules.bird_dir = 1
 	bird_rules.bird_dirs = [-1, 1, -1]
 	game.call("_update_birds")
+	var center_bird: Node3D = bird_models[1]
+	var hover_position: Vector3 = game.get("walker").position + Vector3(0.0, 2.0, -5.0)
+	var camera: Camera3D = game.get("camera")
+	var entry_offset := center_bird.position - hover_position
+	if entry_offset.dot(camera.global_transform.basis.x) < 23.0 or entry_offset.dot(camera.global_transform.basis.y) < 12.0 or not is_equal_approx(-center_bird.transform.basis.z.normalized().x, -1.0):
+		printerr("FAIL: birds did not enter from the upper right corner")
+		quit(1)
+		return true
+	bird_rules.bird_entry_side = -1
+	game.call("_update_birds")
+	entry_offset = center_bird.position - hover_position
+	if entry_offset.dot(camera.global_transform.basis.x) > -23.0 or entry_offset.dot(camera.global_transform.basis.y) < 12.0 or not is_equal_approx(-center_bird.transform.basis.z.normalized().x, 1.0):
+		printerr("FAIL: birds did not enter from the upper left corner")
+		quit(1)
+		return true
+	bird_rules.bird_timer = Rules.BIRD_APPROACH * 0.5
+	game.call("_update_birds")
+	if center_bird.position.distance_to(hover_position) >= entry_offset.length():
+		printerr("FAIL: birds did not fly toward the hover position")
+		quit(1)
+		return true
+	bird_rules.bird_phase = "warn"
+	bird_rules.bird_timer = Rules.BIRD_WARN
+	game.call("_update_birds")
+	if not center_bird.position.is_equal_approx(hover_position):
+		printerr("FAIL: birds did not hover at their arrival position")
+		quit(1)
+		return true
 	for index in bird_models.size():
 		var bird: Node3D = bird_models[index]
 		if not bird.visible or not is_equal_approx(-bird.transform.basis.z.normalized().x, float(bird_rules.bird_dirs[index])):

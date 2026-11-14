@@ -97,7 +97,8 @@ func _process(delta: float) -> void:
 		if rules.state == "walking":
 			for event in rules.update(dt, _lean_input()):
 				match event["type"]:
-					"birds": hud.show_toast("Birds! Lean toward the middle bird")
+					"birds": hud.show_toast("Birds incoming!")
+					"birds_arrived": hud.show_toast("Lean toward the middle bird")
 					"birds_pass": hud.show_toast("Birds passed")
 					"gust": hud.show_toast("Wind changes direction")
 					"fall":
@@ -231,14 +232,20 @@ func _update_walker(_dt: float) -> void:
 
 
 func _update_birds() -> void:
-	var active := rules.stage_kind() == "Birds" and rules.bird_phase == "warn" and rules.state == "walking"
+	var active := rules.stage_kind() == "Birds" and (rules.bird_phase == "approach" or rules.bird_phase == "warn") and rules.state == "walking"
 	for index in birds.size():
 		var bird := birds[index]
 		bird.visible = active
 		if active:
-			var approach := rules.bird_timer / Rules.BIRD_WARN
-			bird.position = walker.position + Vector3((index - 1) * 2.8 + rules.bird_dir * (1.0 - approach), 2.0, -5.0 - approach * 14.0)
-			bird.rotation.y = -PI * 0.5 * rules.bird_dirs[index]
+			var hover_position := walker.position + Vector3((index - 1) * 2.8, 2.0, -5.0)
+			if rules.bird_phase == "approach":
+				var entry_position := hover_position + camera.global_transform.basis.x * (rules.bird_entry_side * 24.0) + camera.global_transform.basis.y * 13.0
+				var progress := 1.0 - clampf(rules.bird_timer / Rules.BIRD_APPROACH, 0.0, 1.0)
+				bird.position = entry_position.lerp(hover_position, smoothstep(0.0, 1.0, progress))
+				bird.rotation.y = PI * 0.5 * rules.bird_entry_side
+			else:
+				bird.position = hover_position
+				bird.rotation.y = -PI * 0.5 * rules.bird_dirs[index]
 
 
 func _update_ropes() -> void:
@@ -299,7 +306,7 @@ func _update_hud() -> void:
 	var cue := "Keep the pole level"
 	match rules.stage_kind():
 		"Wind": cue = "Wind: %s  %.0f%%" % ["RIGHT" if rules.wind_dir > 0 else "LEFT", rules.wind_ramp * 100.0]
-		"Birds": cue = "Birds: lean %s" % ["RIGHT" if rules.bird_dir > 0 else "LEFT"] if rules.bird_phase == "warn" else "Watch for the birds"
+		"Birds": cue = "Birds: lean %s" % ["RIGHT" if rules.bird_dir > 0 else "LEFT"] if rules.bird_phase == "warn" else ("Birds incoming" if rules.bird_phase == "approach" else "Watch for the birds")
 		"Tension": cue = "Tension: %.0f%%  •  Space to release" % [rules.tension * 100.0]
 		"Sway": cue = "Sway: %.0f%%  •  Step near center" % [rules.sway * 100.0]
 	hud.show_status(rules.tower, rules.step, Rules.STEPS_PER_TOWER, rules.stage_kind(), rules.tilt, cue)

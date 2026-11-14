@@ -16,6 +16,7 @@ const WOBBLE := 0.28
 const WIND_ENABLED := false
 const WIND_PUSH := 0.9
 const WIND_RAMP_TIME := 1.2
+const BIRD_APPROACH := 1.3
 const BIRD_WARN := 2.2
 const BIRD_REST := 1.6
 const BIRD_MARGIN := 0.1
@@ -51,6 +52,7 @@ var bird_phase := "rest"
 var bird_timer := 1.8
 var bird_dir := 1
 var bird_dirs := [1, 1, 1]
+var bird_entry_side := 1
 var tension := 0.0
 var sway := 0.0
 var push := 0.0
@@ -123,13 +125,18 @@ func update(delta: float, lean: float) -> Array[Dictionary]:
 		"Birds":
 			bird_timer -= dt
 			if bird_phase == "rest" and bird_timer <= 0.0:
-				bird_phase = "warn"
-				bird_timer = BIRD_WARN
+				bird_phase = "approach"
+				bird_timer = BIRD_APPROACH
+				bird_entry_side = _random_sign()
 				bird_dir = _random_sign()
 				bird_dirs = [_random_sign(), bird_dir, _random_sign()]
 				if bird_dirs[0] == bird_dir and bird_dirs[2] == bird_dir:
 					bird_dirs[_rng.randi_range(0, 1) * 2] = -bird_dir
-				events.append({"type": "birds", "dir": bird_dir})
+				events.append({"type": "birds", "entry_side": bird_entry_side})
+			elif bird_phase == "approach" and bird_timer <= 0.0:
+				bird_phase = "warn"
+				bird_timer = BIRD_WARN
+				events.append({"type": "birds_arrived", "dir": bird_dir})
 			elif bird_phase == "warn" and bird_timer <= 0.0:
 				bird_phase = "rest"
 				if bird_check(tilt, bird_dir):
@@ -237,6 +244,7 @@ func _reset_stage() -> void:
 	bird_timer = 1.8
 	bird_dir = 1
 	bird_dirs = [1, 1, 1]
+	bird_entry_side = 1
 	tension = 0.0
 	sway = 0.0
 	push = 0.0

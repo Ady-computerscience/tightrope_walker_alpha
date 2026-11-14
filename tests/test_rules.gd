@@ -108,12 +108,29 @@ func _test_birds() -> void:
 	run.tower = 2
 	run.bird_timer = 0.0
 	var events := run.update(1.0 / 60.0, 0.0)
-	_check(events.size() == 1 and events[0]["type"] == "birds", "birds warn before attack")
+	_check(events.size() == 1 and events[0]["type"] == "birds" and run.bird_phase == "approach", "birds approach before warning")
+	_check(run.bird_entry_side == -1 or run.bird_entry_side == 1, "birds enter from a side")
 	_check(run.bird_dirs[1] == run.bird_dir, "middle bird indicates target lean")
 	run.tilt = -0.3 * run.bird_dir
+	run.bird_timer = Rules.BIRD_APPROACH * 0.5
+	events = run.update(1.0 / 60.0, 0.0)
+	_check(run.bird_phase == "approach" and events.is_empty(), "wrong lean is not checked during approach")
+	run.bird_timer = 0.0
+	events = run.update(1.0 / 60.0, 0.0)
+	_check(run.bird_phase == "warn" and is_equal_approx(run.bird_timer, Rules.BIRD_WARN) and events.size() == 1 and events[0]["type"] == "birds_arrived", "reaction countdown starts when birds arrive")
 	run.bird_timer = 0.0
 	events = run.update(1.0 / 60.0, 0.0)
 	_check(run.state == "falling" and events.back().get("reason") == "birds", "wrong lean falls")
+	var saw_left := false
+	var saw_right := false
+	for seed_value in range(1, 25):
+		var flock := Rules.new(seed_value)
+		flock.tower = 2
+		flock.bird_timer = 0.0
+		flock.update(1.0 / 60.0, 0.0)
+		saw_left = saw_left or flock.bird_entry_side == -1
+		saw_right = saw_right or flock.bird_entry_side == 1
+	_check(saw_left and saw_right, "bird entry side varies across seeded rounds")
 	_check(Rules.bird_check(0.3, 1) and Rules.bird_check(-0.3, -1), "correct bird lean passes")
 	_check(not Rules.bird_check(0.02, 1), "small bird lean fails")
 
