@@ -1,0 +1,18 @@
+newmtl Wedge1Mtl
+Material Color
+Ka 0.0302565 0.0209511 0.0477758
+Kd 0.0302565 0.0209511 0.0477758
+Ks 0.00118653 0.000821613 0.00187356 
+
+d 1
+
+Ns 0
+
+map_Ka Wedge1_diff.png
+map_Kd Wedge1_diff.png
+map_d Wedge1_diff.png
+
+map_Bump Wedge1_nmap.png
+
+map_Ns Wedge1_spec.png
+

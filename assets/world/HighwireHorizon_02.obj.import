@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://cd7rpub6rldim"
+path="res://.godot/imported/HighwireHorizon_02.obj-bd8cf126b1474387daf93b90bd0bec3d.mesh"
+
+[deps]
+
+files=["res://.godot/imported/HighwireHorizon_02.obj-bd8cf126b1474387daf93b90bd0bec3d.mesh"]
+
+source_file="res://assets/world/HighwireHorizon_02.obj"
+dest_files=["res://.godot/imported/HighwireHorizon_02.obj-bd8cf126b1474387daf93b90bd0bec3d.mesh", "res://.godot/imported/HighwireHorizon_02.obj-bd8cf126b1474387daf93b90bd0bec3d.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

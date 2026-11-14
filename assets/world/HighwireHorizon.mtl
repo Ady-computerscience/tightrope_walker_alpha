@@ -1,0 +1,496 @@
+newmtl Box00120Mtl
+Material Color
+Ka 0.176774 0.0494335 0.0277553
+Kd 0.176774 0.0494335 0.0277553
+Ks 0.00693233 0.00193857 0.00108844 
+
+d 1
+
+Ns 0
+
+map_Ka Box0061_diff.png
+map_Kd Box0061_diff.png
+map_d Box0061_diff.png
+
+map_Bump Box0061_nmap.png
+
+map_Ns Box0061_spec.png
+
+newmtl Box0149Mtl
+Material Color
+Ka 0.329729 0.0846415 0.0370285
+Kd 0.329729 0.0846415 0.0370285
+Ks 0.0129306 0.00331927 0.0014521 
+
+d 1
+
+Ns 0
+
+map_Ka Box0061_diff.png
+map_Kd Box0061_diff.png
+map_d Box0061_diff.png
+
+map_Bump Box0061_nmap.png
+
+map_Ns Box0061_spec.png
+
+newmtl Sphere0019Mtl
+Material Color
+Ka 1 0.74453 0.45908
+Kd 1 0.74453 0.45908
+Ks 0.396078 0.294892 0.181832 
+
+d 0.65098
+
+Ns 0
+
+map_Ka Segment0052_diff.png
+map_Kd Segment0052_diff.png
+map_d Segment0052_diff.png
+
+map_Bump Segment0052_nmap.png
+
+newmtl Box00116Mtl
+Material Color
+Ka 0.694081 0.476177 0.20836
+Kd 0.694081 0.476177 0.20836
+Ks 0.0190532 0.0130715 0.00571968 
+
+d 0.141176
+
+Ns 0
+
+map_Ka Seg211_diff.png
+map_Kd Seg211_diff.png
+map_d Seg211_diff.png
+
+map_Bump Seg211_nmap.png
+
+map_Ns Seg211_spec.png
+
+newmtl Box0015Mtl
+Material Color
+Ka 0.659224 0.0824142 0.0289912
+Kd 0.659224 0.0824142 0.0289912
+Ks 0.0180963 0.00226235 0.000795837 
+
+d 1
+
+Ns 0
+
+map_Ka Seg211_diff.png
+map_Kd Seg211_diff.png
+map_d Seg211_diff.png
+
+map_Bump Seg211_nmap.png
+
+map_Ns Seg211_spec.png
+
+newmtl Segment0025Mtl
+Material Color
+Ka 0.694081 0.476177 0.20836
+Kd 0.694081 0.476177 0.20836
+Ks 0.0190532 0.0130715 0.00571968 
+
+d 1
+
+Ns 0
+
+map_Ka Seg211_diff.png
+map_Kd Seg211_diff.png
+map_d Seg211_diff.png
+
+map_Bump Seg211_nmap.png
+
+map_Ns Seg211_spec.png
+
+newmtl Box0201Mtl
+Material Color
+Ka 0.547994 0.190463 0.0697271
+Kd 0.547994 0.190463 0.0697271
+Ks 0.0214899 0.00746913 0.0027344 
+
+d 1
+
+Ns 0
+
+map_Ka Box0061_diff.png
+map_Kd Box0061_diff.png
+map_d Box0061_diff.png
+
+map_Bump Box0061_nmap.png
+
+map_Ns Box0061_spec.png
+
+newmtl Box0251Mtl
+Material Color
+Ka 0.442323 0.88318 0.625345
+Kd 0.442323 0.88318 0.625345
+Ks 0.0398958 0.0796594 0.0564036 
+
+d 1
+
+Ns 0
+
+newmtl Box0012Mtl
+Material Color
+Ka 0.0242229 0.320382 0.329729
+Kd 0.0242229 0.320382 0.329729
+Ks 0.000664944 0.00879479 0.00905139 
+
+d 1
+
+Ns 0
+
+map_Ka Seg211_diff.png
+map_Kd Seg211_diff.png
+map_d Seg211_diff.png
+
+map_Bump Seg211_nmap.png
+
+map_Ns Seg211_spec.png
+
+newmtl Rug1Mtl
+Material Color
+Ka 0.157281 0.0445526 0.0738278
+Kd 0.157281 0.0445526 0.0738278
+Ks 0.00431751 0.00122301 0.00202664 
+
+d 1
+
+Ns 0
+
+map_Ka Seg211_diff.png
+map_Kd Seg211_diff.png
+map_d Seg211_diff.png
+
+map_Bump Seg211_nmap.png
+
+map_Ns Seg211_spec.png
+
+newmtl Segment0062Mtl
+Material Color
+Ka 1 0.789314 0.453456
+Kd 1 0.789314 0.453456
+Ks 0.027451 0.0216674 0.0124478 
+
+d 1
+
+Ns 0
+
+map_Ka Seg211_diff.png
+map_Kd Seg211_diff.png
+map_d Seg211_diff.png
+
+map_Bump Seg211_nmap.png
+
+map_Ns Seg211_spec.png
+
+newmtl Segment0102Mtl
+Material Color
+Ka 0.230998 0.0891935 0.0328759
+Kd 0.230998 0.0891935 0.0328759
+Ks 0.0126823 0.0048969 0.00180495 
+
+d 1
+
+Ns 0
+
+map_Ka Benchleg1_diff.png
+map_Kd Benchleg1_diff.png
+map_d Benchleg1_diff.png
+
+map_Bump Benchleg1_nmap.png
+
+map_Ns Benchleg1_spec.png
+
+newmtl Telescopelens1Mtl
+Material Color
+Ka 1 0.907547 0.585973
+Kd 1 0.907547 0.585973
+Ks 0.0901961 0.0818572 0.0528525 
+
+d 1
+
+Ns 0
+
+newmtl Telescopepost1Mtl
+Material Color
+Ka 0.106156 0.0445526 0.0169881
+Kd 0.106156 0.0445526 0.0169881
+Ks 0.0707707 0.0297018 0.0113254 
+
+d 1
+
+Ns 255
+
+map_Ka Tower3checkpoint1_diff.png
+map_Kd Tower3checkpoint1_diff.png
+map_d Tower3checkpoint1_diff.png
+
+map_Bump Tower3checkpoint1_nmap.png
+
+map_Ns Tower3checkpoint1_spec.png
+
+newmtl Stargazebench1Mtl
+Material Color
+Ka 0.197516 0.0824142 0.0302565
+Kd 0.197516 0.0824142 0.0302565
+Ks 0.0147169 0.00614067 0.00225441 
+
+d 1
+
+Ns 0
+
+map_Ka Stargazebench1_diff.png
+map_Kd Stargazebench1_diff.png
+map_d Stargazebench1_diff.png
+
+map_Bump Stargazebench1_nmap.png
+
+map_Ns Stargazebench1_spec.png
+
+newmtl Segment0052Mtl
+Material Color
+Ka 0.160444 0.22331 0.0938759
+Kd 0.160444 0.22331 0.0938759
+Ks 0.0635482 0.0884484 0.0371822 
+
+d 1
+
+Ns 0
+
+map_Ka Segment0052_diff.png
+map_Kd Segment0052_diff.png
+map_d Segment0052_diff.png
+
+map_Bump Segment0052_nmap.png
+
+newmtl Spike11Mtl
+Material Color
+Ka 1 0.701169 0.288816
+Kd 1 0.701169 0.288816
+Ks 0.0901961 0.0632427 0.0260501 
+
+d 1
+
+Ns 0
+
+newmtl Telescopetube1Mtl
+Material Color
+Ka 0.358654 0.151058 0.0581872
+Kd 0.358654 0.151058 0.0581872
+Ks 0.239103 0.100705 0.0387915 
+
+d 1
+
+Ns 255
+
+map_Ka Tower3checkpoint1_diff.png
+map_Kd Tower3checkpoint1_diff.png
+map_d Tower3checkpoint1_diff.png
+
+map_Bump Tower3checkpoint1_nmap.png
+
+map_Ns Tower3checkpoint1_spec.png
+
+newmtl Star231Mtl
+Material Color
+Ka 0.464741 0.722672 1
+Kd 0.464741 0.722672 1
+Ks 0.0419178 0.0651822 0.0901961 
+
+d 1
+
+Ns 0
+
+newmtl Spike4Mtl
+Material Color
+Ka 0.598942 0.796917 1
+Kd 0.598942 0.796917 1
+Ks 0.0540222 0.0718787 0.0901961 
+
+d 1
+
+Ns 0
+
+newmtl Halo1Mtl
+Material Color
+Ka 0.701169 0.851252 1
+Kd 0.701169 0.851252 1
+Ks 0.0632427 0.0767796 0.0901961 
+
+d 0.141176
+
+Ns 0
+
+newmtl Spike1Mtl
+Material Color
+Ka 1 0.932277 0.84337
+Kd 1 0.932277 0.84337
+Ks 0.0901961 0.0840877 0.0760686 
+
+d 1
+
+Ns 0
+
+newmtl Star221Mtl
+Material Color
+Ka 1 1 1
+Kd 1 1 1
+Ks 0.0901961 0.0901961 0.0901961 
+
+d 1
+
+Ns 0
+
+newmtl Halo4Mtl
+Material Color
+Ka 1 0.781751 0.442323
+Kd 1 0.781751 0.442323
+Ks 0.0901961 0.0705108 0.0398958 
+
+d 0.141176
+
+Ns 0
+
+newmtl Benchleg1Mtl
+Material Color
+Ka 0.106156 0.0445526 0.0169881
+Kd 0.106156 0.0445526 0.0169881
+Ks 0.00582818 0.00244603 0.000932677 
+
+d 1
+
+Ns 0
+
+map_Ka Benchleg1_diff.png
+map_Kd Benchleg1_diff.png
+map_d Benchleg1_diff.png
+
+map_Bump Benchleg1_nmap.png
+
+map_Ns Benchleg1_spec.png
+
+newmtl Lanternglow1Mtl
+Material Color
+Ka 1 0.68002 0.311181
+Kd 1 0.68002 0.311181
+Ks 0.0901961 0.0613352 0.0280673 
+
+d 1
+
+Ns 0
+
+newmtl Box0061Mtl
+Material Color
+Ka 0.781751 0.529523 0.242796
+Kd 0.781751 0.529523 0.242796
+Ks 0.0306569 0.0207656 0.00952143 
+
+d 1
+
+Ns 0
+
+map_Ka Box0061_diff.png
+map_Kd Box0061_diff.png
+map_d Box0061_diff.png
+
+map_Bump Box0061_nmap.png
+
+map_Ns Box0061_spec.png
+
+newmtl Tower3checkpoint1Mtl
+Material Color
+Ka 0.0545923 0.0289912 0.0253713
+Kd 0.0545923 0.0289912 0.0253713
+Ks 0.0363949 0.0193275 0.0169142 
+
+d 1
+
+Ns 255
+
+map_Ka Tower3checkpoint1_diff.png
+map_Kd Tower3checkpoint1_diff.png
+map_d Tower3checkpoint1_diff.png
+
+map_Bump Tower3checkpoint1_nmap.png
+
+map_Ns Tower3checkpoint1_spec.png
+
+newmtl Star31Mtl
+Material Color
+Ka 1 0.598942 0.121986
+Kd 1 0.598942 0.121986
+Ks 0.0901961 0.0540222 0.0110026 
+
+d 1
+
+Ns 0
+
+newmtl Halo3Mtl
+Material Color
+Ka 1 0.948965 0.88318
+Kd 1 0.948965 0.88318
+Ks 0.0901961 0.0855929 0.0796594 
+
+d 0.141176
+
+Ns 0
+
+newmtl Seg211Mtl
+Material Color
+Ka 0.84337 0.68002 0.420508
+Kd 0.84337 0.68002 0.420508
+Ks 0.0231513 0.0186672 0.0115434 
+
+d 1
+
+Ns 0
+
+map_Ka Seg211_diff.png
+map_Kd Seg211_diff.png
+map_d Seg211_diff.png
+
+map_Bump Seg211_nmap.png
+
+map_Ns Seg211_spec.png
+
+newmtl Segment0091Mtl
+Material Color
+Ka 0.923993 0.523443 0.0399472
+Kd 0.923993 0.523443 0.0399472
+Ks 0.615996 0.348962 0.0266314 
+
+d 1
+
+Ns 255
+
+map_Ka Tower3checkpoint1_diff.png
+map_Kd Tower3checkpoint1_diff.png
+map_d Tower3checkpoint1_diff.png
+
+map_Bump Tower3checkpoint1_nmap.png
+
+map_Ns Tower3checkpoint1_spec.png
+
+newmtl Halo2Mtl
+Material Color
+Ka 1 1 1
+Kd 1 1 1
+Ks 0.0901961 0.0901961 0.0901961 
+
+d 0.141176
+
+Ns 0
+
+newmtl Star41Mtl
+Material Color
+Ka 1 0.907547 0.781751
+Kd 1 0.907547 0.781751
+Ks 0.0901961 0.0818572 0.0705108 
+
+d 1
+
+Ns 0
+
