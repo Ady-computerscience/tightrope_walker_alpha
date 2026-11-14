@@ -42,8 +42,6 @@ var intro_elapsed := 0.0
 var outro_elapsed := 0.0
 var mode := "intro"
 var paused := false
-var touch_left := false
-var touch_right := false
 var best_time := INF
 var camera_position := Vector3.ZERO
 var camera_look := Vector3.ZERO
@@ -58,10 +56,6 @@ func _ready() -> void:
 	_build_world()
 	hud = HudScene.new()
 	add_child(hud)
-	hud.lean_left.connect(func(value: bool) -> void: touch_left = value)
-	hud.lean_right.connect(func(value: bool) -> void: touch_right = value)
-	hud.step_requested.connect(_step)
-	hud.release_requested.connect(_release)
 	hud.replay_requested.connect(_restart)
 	hud.stargaze_requested.connect(_stargaze)
 	hud.pause_requested.connect(_toggle_pause)
@@ -183,9 +177,7 @@ func _toggle_pause() -> void:
 
 
 func _lean_input() -> float:
-	var keyboard := Input.get_axis("lean_left", "lean_right")
-	var touch := float(int(touch_right) - int(touch_left))
-	return clampf(keyboard + touch, -1.0, 1.0)
+	return Input.get_axis("lean_left", "lean_right")
 
 
 func _step_pressed() -> bool:

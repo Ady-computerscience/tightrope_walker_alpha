@@ -1,11 +1,7 @@
 class_name GameHUD
 extends CanvasLayer
-## Screen controls and status for keyboard, gamepad, and touch players.
+## On-screen status and menus for keyboard and gamepad players.
 
-signal lean_left(pressed: bool)
-signal lean_right(pressed: bool)
-signal step_requested
-signal release_requested
 signal replay_requested
 signal stargaze_requested
 signal pause_requested
@@ -25,7 +21,6 @@ var _toast: Label
 var _win: PanelContainer
 var _win_text: Label
 var _paused: PanelContainer
-var _controls: HBoxContainer
 
 
 func _ready() -> void:
@@ -57,12 +52,10 @@ func show_caption(message: String) -> void:
 func show_win(seconds: float, falls: int, best_time: float) -> void:
 	_win_text.text = "YOU CROSSED THE SKY\n\nTime: %.1f s    Falls: %d\nBest: %.1f s" % [seconds, falls, best_time]
 	_win.visible = true
-	_controls.visible = false
 
 
 func hide_win() -> void:
 	_win.visible = false
-	_controls.visible = true
 
 
 func set_paused(value: bool) -> void:
@@ -116,28 +109,6 @@ func _build() -> void:
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_toast.visible = false
 	root.add_child(_toast)
-
-	_controls = HBoxContainer.new()
-	_controls.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_controls.offset_top = -84.0
-	_controls.offset_bottom = -12.0
-	_controls.alignment = BoxContainer.ALIGNMENT_CENTER
-	_controls.add_theme_constant_override("separation", 12)
-	root.add_child(_controls)
-	var left := _button("◀ LEAN")
-	_controls.add_child(left)
-	left.button_down.connect(func() -> void: lean_left.emit(true))
-	left.button_up.connect(func() -> void: lean_left.emit(false))
-	var right := _button("LEAN ▶")
-	_controls.add_child(right)
-	right.button_down.connect(func() -> void: lean_right.emit(true))
-	right.button_up.connect(func() -> void: lean_right.emit(false))
-	var step_button := _button("STEP")
-	_controls.add_child(step_button)
-	step_button.pressed.connect(func() -> void: step_requested.emit())
-	var release_button := _button("RELEASE")
-	_controls.add_child(release_button)
-	release_button.pressed.connect(func() -> void: release_requested.emit())
 
 	_win = PanelContainer.new()
 	_win.set_anchors_preset(Control.PRESET_CENTER)

@@ -4,7 +4,7 @@ A Godot 4.7 single-player port of the supplied Roblox game. The balance and stag
 
 ## Play
 
-Open `project.godot` in Godot 4.7 and run the project. Press **W** to step with the left foot or **O** to step with the right foot; lean with **Q/P**. Release tension with **Space** or **E**, pause with **Escape**, and restart with **R**. The gamepad and touch step button alternate feet automatically.
+Open `project.godot` in Godot 4.7 and run the project. Press **W** to step with the left foot or **O** to step with the right foot; lean with **Q/P**. Release tension with **Space** or **E**, pause with **Escape**, and restart with **R**. The gamepad step button alternates feet automatically.
 
 The four towers challenge wind, birds, tension, and sway. A fall returns the walker to the start of the current tower. The final step opens a win card; **Stargaze** plays the ending camera move.
 
