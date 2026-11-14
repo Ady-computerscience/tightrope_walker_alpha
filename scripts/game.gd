@@ -10,6 +10,8 @@ const LOAD_SAG := 0.9
 const ROPE_SEGMENTS := 26
 const ROPE_COLOR := Color("ecd6ac")
 const HOT_COLOR := Color("ff5c46")
+const POLE_WAIST_Y := 1.15
+const POLE_FRONT_Z := 0.42
 const STORIES := [
 	"The wind has turned everyone back. Not tonight.",
 	"Even the birds doubt you. Let them watch you prove them wrong.",
@@ -207,7 +209,7 @@ func _update_walker(_dt: float) -> void:
 		feet.x += rules.fall_dir * fall_elapsed * 3.0
 	walker.position = feet
 	walker.rotation.z = -rules.tilt * deg_to_rad(30.0)
-	pole.rotation.z = rules.tilt * deg_to_rad(12.0)
+	pole.rotation.z = PI * 0.5 + rules.tilt * deg_to_rad(12.0)
 
 
 func _update_birds() -> void:
@@ -337,8 +339,8 @@ func _build_world() -> void:
 	pole_mesh.height = 13.0
 	pole.mesh = pole_mesh
 	pole.material_override = _material(Color("966038"))
-	pole.rotation_degrees.z = 90.0
-	pole.position.y = 2.1
+	pole.rotation.z = PI * 0.5
+	pole.position = Vector3(0.0, POLE_WAIST_Y, POLE_FRONT_Z)
 	walker.add_child(pole)
 	for bird_number in 3:
 		var bird := MeshInstance3D.new()
