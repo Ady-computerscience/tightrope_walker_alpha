@@ -20,6 +20,37 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: game scene did not initialize")
 		quit(1)
 		return true
+	var bird_models: Array = game.get("birds")
+	if bird_models.size() != 3:
+		printerr("FAIL: three bird models were not created")
+		quit(1)
+		return true
+	for bird in bird_models:
+		var bird_animation := bird.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		if bird_animation == null or not bird_animation.has_animation("australasian_swamphen_fly") or bird_animation.current_animation != "australasian_swamphen_fly" or bird_animation.get_animation("australasian_swamphen_fly").loop_mode != Animation.LOOP_LINEAR:
+			printerr("FAIL: bird model is missing its playing flight animation")
+			quit(1)
+			return true
+	var bird_rules: TightropeRules = game.get("rules")
+	bird_rules.tower = 2
+	bird_rules.bird_phase = "warn"
+	bird_rules.bird_dir = 1
+	bird_rules.bird_dirs = [-1, 1, -1]
+	game.call("_update_birds")
+	for index in bird_models.size():
+		var bird: Node3D = bird_models[index]
+		if not bird.visible or not is_equal_approx(-bird.transform.basis.z.normalized().x, float(bird_rules.bird_dirs[index])):
+			printerr("FAIL: bird model does not face its assigned left/right direction")
+			quit(1)
+			return true
+	bird_rules.bird_phase = "rest"
+	game.call("_update_birds")
+	for bird in bird_models:
+		if bird.visible:
+			printerr("FAIL: bird model remained visible after the warning")
+			quit(1)
+			return true
+	bird_rules.tower = 1
 	if not _has_key_action("step_left", KEY_W) or not _has_key_action("step_right", KEY_O) or not _has_key_action("lean_left", KEY_Q) or not _has_key_action("lean_right", KEY_P):
 		printerr("FAIL: W/O step or Q/P lean bindings are missing")
 		quit(1)

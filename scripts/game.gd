@@ -3,6 +3,8 @@ extends Node3D
 
 const Rules := preload("res://scripts/tightrope_rules.gd")
 const HudScene := preload("res://scripts/game_hud.gd")
+const BirdScene := preload("res://assets/actg/swamphen/australasian_swamphen.glb")
+const BIRD_FLY_ANIMATION := "australasian_swamphen_fly"
 const FEET_Y := 45.0
 const ROPE_Y := 44.87
 const STATIC_SAG := 0.25
@@ -28,7 +30,7 @@ var walker_animation: AnimationPlayer
 var kenney_decor_count := 0
 var pole: MeshInstance3D
 var ropes: Array = []
-var birds: Array[MeshInstance3D] = []
+var birds: Array[Node3D] = []
 var snow: CPUParticles3D
 var visual_z := -4.0
 var step_from := -4.0
@@ -236,8 +238,7 @@ func _update_birds() -> void:
 		if active:
 			var approach := rules.bird_timer / Rules.BIRD_WARN
 			bird.position = walker.position + Vector3((index - 1) * 2.8 + rules.bird_dir * (1.0 - approach), 2.0, -5.0 - approach * 14.0)
-			var material: StandardMaterial3D = bird.material_override
-			material.albedo_color = Color("ffca62") if index == 1 else Color("d7dded")
+			bird.rotation.y = -PI * 0.5 * rules.bird_dirs[index]
 
 
 func _update_ropes() -> void:
@@ -359,14 +360,15 @@ func _build_world() -> void:
 	pole.position = Vector3(0.0, POLE_WAIST_Y, POLE_FRONT_Z)
 	walker.add_child(pole)
 	for bird_number in 3:
-		var bird := MeshInstance3D.new()
-		var bird_mesh := SphereMesh.new()
-		bird_mesh.radius = 0.55
-		bird_mesh.height = 0.6
-		bird.mesh = bird_mesh
-		bird.material_override = _material(Color("d7dded"))
+		var bird := BirdScene.instantiate() as Node3D
+		bird.name = "Center Bird" if bird_number == 1 else ("Left Flanker" if bird_number == 0 else "Right Flanker")
+		bird.scale = Vector3.ONE * (2.4 if bird_number == 1 else 1.9)
 		bird.visible = false
 		add_child(bird)
+		var bird_animation := bird.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		if bird_animation != null and bird_animation.has_animation(BIRD_FLY_ANIMATION):
+			bird_animation.get_animation(BIRD_FLY_ANIMATION).loop_mode = Animation.LOOP_LINEAR
+			bird_animation.play(BIRD_FLY_ANIMATION)
 		birds.append(bird)
 	snow = CPUParticles3D.new()
 	snow.amount = 120
