@@ -36,6 +36,7 @@ var step_to := -4.0
 var step_elapsed := 0.0
 var step_duration := 0.0
 var step_result := ""
+var last_step_foot := ""
 var fall_elapsed := 0.0
 var intro_elapsed := 0.0
 var outro_elapsed := 0.0
@@ -77,17 +78,21 @@ func _process(delta: float) -> void:
 		return
 	if mode == "intro":
 		intro_elapsed += dt
-		if Input.is_action_just_pressed("step") and intro_elapsed >= 2.0 or intro_elapsed >= 9.2:
+		if _step_pressed() and intro_elapsed >= 2.0 or intro_elapsed >= 9.2:
 			mode = "walking"
 			hud.show_caption("")
 			_announce_tower()
 	elif mode == "outro":
 		outro_elapsed += dt
-		if Input.is_action_just_pressed("step") and outro_elapsed >= 2.0 or outro_elapsed >= 13.0:
+		if _step_pressed() and outro_elapsed >= 2.0 or outro_elapsed >= 13.0:
 			mode = "stargaze"
 			hud.show_caption("The stars kept their promise.")
 	elif mode == "walking":
-		if Input.is_action_just_pressed("step"):
+		if Input.is_action_just_pressed("step_left"):
+			_step("left")
+		elif Input.is_action_just_pressed("step_right"):
+			_step("right")
+		elif Input.is_action_just_pressed("step"):
 			_step()
 		if Input.is_action_just_pressed("release"):
 			_release()
@@ -119,12 +124,15 @@ func _process(delta: float) -> void:
 	_update_hud()
 
 
-func _step() -> void:
+func _step(foot: String = "") -> void:
 	if mode != "walking" or paused or step_duration > 0.0 or rules.state != "walking":
 		return
 	var result := rules.try_step()
 	if result == "blocked" or result == "cooldown":
 		return
+	if foot.is_empty():
+		foot = "right" if last_step_foot == "left" else "left"
+	last_step_foot = foot
 	step_from = visual_z
 	step_to = Rules.step_z(rules.tower, rules.step)
 	if result == "won":
@@ -133,6 +141,9 @@ func _step() -> void:
 	step_elapsed = 0.0
 	step_result = result
 	_play_walker_animation("walk")
+	if walker_animation != null and walker_animation.has_animation("walk"):
+		var walk := walker_animation.get_animation("walk")
+		walker_animation.seek(walk.length * (0.5 if foot == "right" else 0.0), true)
 
 
 func _release() -> void:
@@ -145,6 +156,7 @@ func _restart() -> void:
 	mode = "walking"
 	rules = Rules.new()
 	visual_z = Rules.step_z(1, 0)
+	last_step_foot = ""
 	_play_walker_animation("idle")
 	step_duration = 0.0
 	fall_elapsed = 0.0
@@ -174,6 +186,10 @@ func _lean_input() -> float:
 	var keyboard := Input.get_axis("lean_left", "lean_right")
 	var touch := float(int(touch_right) - int(touch_left))
 	return clampf(keyboard + touch, -1.0, 1.0)
+
+
+func _step_pressed() -> bool:
+	return Input.is_action_just_pressed("step_left") or Input.is_action_just_pressed("step_right") or Input.is_action_just_pressed("step")
 
 
 func _update_step(dt: float) -> void:
@@ -279,7 +295,7 @@ func _update_camera(dt: float) -> void:
 
 
 func _update_hud() -> void:
-	var cue := "A / D lean  •  W step  •  Space release"
+	var cue := "Space: release tension"
 	match rules.stage_kind():
 		"Wind": cue = "Wind: %s  %.0f%%" % ["RIGHT" if rules.wind_dir > 0 else "LEFT", rules.wind_ramp * 100.0]
 		"Birds": cue = "Birds: lean %s" % ["RIGHT" if rules.bird_dir > 0 else "LEFT"] if rules.bird_phase == "warn" else "Watch for the birds"
@@ -545,12 +561,10 @@ func _material(color: Color, unshaded: bool = false) -> StandardMaterial3D:
 
 
 func _install_input_actions() -> void:
-	_add_key("lean_left", KEY_A)
-	_add_key("lean_left", KEY_LEFT)
-	_add_key("lean_right", KEY_D)
-	_add_key("lean_right", KEY_RIGHT)
-	_add_key("step", KEY_W)
-	_add_key("step", KEY_UP)
+	_add_key("lean_left", KEY_Q)
+	_add_key("lean_right", KEY_P)
+	_add_key("step_left", KEY_W)
+	_add_key("step_right", KEY_O)
 	_add_key("release", KEY_SPACE)
 	_add_key("release", KEY_E)
 	_add_key("pause_run", KEY_ESCAPE)
@@ -571,6 +585,8 @@ func _add_key(action: StringName, key: Key) -> void:
 
 
 func _add_joy_button(action: StringName, button: JoyButton) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
 	var event := InputEventJoypadButton.new()
 	event.button_index = button
 	InputMap.action_add_event(action, event)

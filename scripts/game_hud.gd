@@ -77,7 +77,7 @@ func _build() -> void:
 
 	var top := PanelContainer.new()
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	top.offset_bottom = 108.0
+	top.offset_bottom = 134.0
 	top.add_theme_stylebox_override("panel", _panel_style())
 	root.add_child(top)
 	var top_box := VBoxContainer.new()
@@ -94,7 +94,8 @@ func _build() -> void:
 	_balance.show_percentage = false
 	_balance.custom_minimum_size = Vector2(0, 12)
 	top_box.add_child(_balance)
-	_cue = _label("A / D to lean • W to step", 14, CREAM)
+	top_box.add_child(_label("W / O: left / right foot   •   Q / P: lean left / right", 14, CREAM))
+	_cue = _label("Space: release tension", 14, CREAM)
 	top_box.add_child(_cue)
 
 	_caption = _label("", 22, CREAM)
