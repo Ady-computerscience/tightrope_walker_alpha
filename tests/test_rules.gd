@@ -10,7 +10,7 @@ func _initialize() -> void:
 	_test_safe_checkpoints()
 	_test_steps_and_checkpoints()
 	_test_checkpoint_respawn()
-	_test_wind_disabled()
+	_test_gust_warning()
 	_test_birds()
 	_test_tension()
 	_test_sway()
@@ -129,17 +129,91 @@ func _enter_rope(run: TightropeRules) -> void:
 	_check(run.on_rope, "first step onto rope completes")
 
 
-func _test_wind_disabled() -> void:
+func _test_gust_warning() -> void:
 	var run := Rules.new(8)
-	_check(run.stage_kind() == "Balance", "tower one uses balance while wind is disabled")
+	_check(run.stage_kind() == "Wind", "first section introduces gust warning")
+	run.wind_timer = 0.01
+	_check(run.update(0.1, 0.0).is_empty() and run.wind_phase == "rest", "gust does not start on the rooftop")
 	_enter_rope(run)
-	for tick in 120:
-		for event in run.update(0.1, 0.0):
-			_check(event["type"] != "gust", "disabled wind emitted a gust at tick %d" % tick)
-		if run.state == "falling":
-			run.respawn()
-			_enter_rope(run)
-		_check(is_zero_approx(run.wind_ramp) and is_equal_approx(run.wind_timer, 0.6), "disabled wind changed its timer or ramp at tick %d" % tick)
+	var events := run.update(1.0 / 60.0, 0.0)
+	_check(run.wind_phase == "cue" and run.wind_flag_side == -run.wind_dir and events.size() == 1 and events[0]["type"] == "gust_cue" and events[0]["side"] == run.wind_flag_side and is_zero_approx(run.wind_ramp), "congruent flag cue precedes the gust")
+	run.wind_timer = 0.0
+	events = run.update(1.0 / 60.0, 0.0, run.wind_flag_side)
+	_check(run.wind_phase == "react" and is_equal_approx(run.wind_timer, Rules.WIND_RESPONSE_TIME) and run.wind_attempts == 1 and run.wind_response == 0 and events.size() == 1 and events[0]["type"] == "gust", "reaction countdown starts when gust arrives")
+	run.wind_dir = 1
+	run.wind_flag_side = -1
+	run.wind_timer = 0.5
+	events = run.update(1.0 / 60.0, 1.0, 1)
+	_check(run.wind_phase == "blow" and run.wind_response == 1 and run.wind_passes == 1 and events.any(func(event: Dictionary) -> bool: return event["type"] == "gust_pass"), "lean opposite flag passes and ends countdown early")
+	for frame in 36:
+		run.update(1.0 / 60.0, 0.0)
+	_check(run.state == "walking", "correct gust response survives the blow")
+	run.respawn()
+	_check(run.wind_attempts == 1 and run.wind_passes == 1 and run.wind_phase == "rest", "gust statistics persist across checkpoint respawns")
+	var wrong := Rules.new(9)
+	_enter_rope(wrong)
+	wrong.wind_phase = "react"
+	wrong.wind_timer = 0.5
+	wrong.wind_dir = 1
+	wrong.wind_flag_side = -1
+	events = wrong.update(1.0 / 60.0, -1.0, -1)
+	_check(wrong.wind_phase == "blow" and wrong.tilt_vel > 6.0 and events.any(func(event: Dictionary) -> bool: return event["type"] == "gust_fail"), "lean toward left flag triggers strong gust")
+	for frame in 36:
+		if wrong.state == "falling":
+			break
+		wrong.update(1.0 / 60.0, -1.0)
+	_check(wrong.state == "falling" and wrong.fall_reason == "balance", "lean toward left flag causes a fall")
+	var wrong_right := Rules.new(12)
+	_enter_rope(wrong_right)
+	wrong_right.wind_phase = "react"
+	wrong_right.wind_timer = 0.5
+	wrong_right.wind_dir = -1
+	wrong_right.wind_flag_side = 1
+	wrong_right.update(1.0 / 60.0, 1.0, 1)
+	for frame in 36:
+		if wrong_right.state == "falling":
+			break
+		wrong_right.update(1.0 / 60.0, 1.0)
+	_check(wrong_right.state == "falling" and wrong_right.fall_reason == "balance", "lean toward right flag causes a fall")
+	var late := Rules.new(10)
+	_enter_rope(late)
+	late.wind_phase = "react"
+	late.wind_timer = 0.01
+	late.wind_dir = -1
+	late.wind_flag_side = 1
+	events = late.update(1.0 / 60.0, 0.0)
+	_check(late.wind_phase == "blow" and late.tilt_vel < -6.0 and events.any(func(event: Dictionary) -> bool: return event["type"] == "gust_fail"), "late response triggers strong gust")
+	var last_frame := Rules.new(11)
+	_enter_rope(last_frame)
+	last_frame.wind_phase = "react"
+	last_frame.wind_timer = 0.01
+	last_frame.wind_dir = -1
+	last_frame.wind_flag_side = 1
+	last_frame.update(1.0 / 60.0, -1.0, -1)
+	_check(last_frame.wind_passes == 1, "lean in final reaction frame passes")
+	var incongruent_cues := 0
+	for seed_value in range(1, 401):
+		var trial := Rules.new(seed_value)
+		trial.wind_timer = 0.0
+		_enter_rope(trial)
+		trial.update(1.0 / 60.0, 0.0)
+		if trial.wind_flag_side == trial.wind_dir:
+			incongruent_cues += 1
+	_check(incongruent_cues == 0, "all gust flag cues show the actual gust source")
+	var later := Rules.new(12)
+	later.tower = 3
+	_enter_rope(later)
+	later.wind_timer = 0.0
+	later.update(1.0 / 60.0, 0.0)
+	_check(later.wind_phase == "cue" and later.wind_flag_side == -later.wind_dir, "congruent gust warning remains active in later sections")
+	var birds := Rules.new(13)
+	birds.tower = 2
+	_enter_rope(birds)
+	birds.bird_phase = "warn"
+	birds.bird_timer = 0.5
+	birds.wind_timer = 0.0
+	birds.update(1.0 / 60.0, 0.0)
+	_check(birds.wind_phase == "rest", "gust cue waits for active birds")
 
 
 func _test_birds() -> void:
@@ -251,7 +325,7 @@ func _test_determinism() -> void:
 		var lean := sin(float(tick) * 0.12)
 		first.update(1.0 / 60.0, lean)
 		second.update(1.0 / 60.0, lean)
-		_check(first.wind_dir == second.wind_dir and is_equal_approx(first.tilt, second.tilt), "seeded run diverges at tick %d" % tick)
+		_check(first.wind_dir == second.wind_dir and first.wind_phase == second.wind_phase and first.wind_flag_side == second.wind_flag_side and is_equal_approx(first.tilt, second.tilt), "seeded run diverges at tick %d" % tick)
 
 
 func _test_full_run(seed_value: int) -> void:
@@ -262,7 +336,8 @@ func _test_full_run(seed_value: int) -> void:
 		if run.stage_kind() == "Birds" and run.bird_phase == "warn":
 			target = 0.3 * run.bird_dir
 		var lean: float = clampf(-((run.tilt - target) * 2.5 + run.tilt_vel * 1.4) - (run.push + run.tilt * Rules.INSTABILITY) / Rules.LEAN_POWER, -1.0, 1.0)
-		var events := run.update(1.0 / 60.0, lean)
+		var gust_response := -run.wind_flag_side if run.wind_phase == "react" else 0
+		var events := run.update(1.0 / 60.0, lean, gust_response)
 		for event in events:
 			if event["type"] == "fall":
 				run.respawn()

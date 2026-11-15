@@ -13,15 +13,15 @@ const WARNING_RED := Color("ff3b3b")
 const MINT := Color("7ee8ac")
 const PANEL := Color("2c182e")
 const CONTROL_HINT_SECONDS := 10.0
-const BIRD_TIMER_HEIGHT := 4.0
+const COUNTDOWN_BAR_HEIGHT := 4.0
 
 var _progress: Label
 var _stage: Label
 var _cue: Label
 var _balance: ProgressBar
-var _bird_timer_track: Panel
-var _bird_timer_fill: Panel
-var _bird_timer_fill_style: StyleBoxFlat
+var _countdown_track: Panel
+var _countdown_fill: Panel
+var _countdown_fill_style: StyleBoxFlat
 var _caption: Label
 var _toast: Label
 var _win: PanelContainer
@@ -61,25 +61,25 @@ func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, c
 	_balance.value = clampf((tilt + 1.0) * 50.0, 0.0, 100.0)
 
 
-func show_bird_timer(screen_position: Vector2, width: float, remaining_fraction: float) -> void:
+func show_countdown_bar(screen_position: Vector2, width: float, remaining_fraction: float) -> void:
 	var fraction := clampf(remaining_fraction, 0.0, 1.0)
 	if fraction <= 0.0:
-		hide_bird_timer()
+		hide_countdown_bar()
 		return
 	var viewport_size := get_viewport().get_visible_rect().size
 	var timer_width := clampf(width, 40.0, viewport_size.x - 24.0)
-	_bird_timer_track.size.x = timer_width
-	_bird_timer_track.position = Vector2(
+	_countdown_track.size.x = timer_width
+	_countdown_track.position = Vector2(
 		clampf(screen_position.x - timer_width * 0.5, 12.0, maxf(12.0, viewport_size.x - timer_width - 12.0)),
-		clampf(screen_position.y, 116.0, maxf(116.0, viewport_size.y - BIRD_TIMER_HEIGHT - 12.0))
+		clampf(screen_position.y, 116.0, maxf(116.0, viewport_size.y - COUNTDOWN_BAR_HEIGHT - 12.0))
 	)
-	_bird_timer_fill.size.x = timer_width * fraction
-	_bird_timer_fill_style.bg_color = WARNING_RED if fraction <= 0.25 else GOLD
-	_bird_timer_track.show()
+	_countdown_fill.size.x = timer_width * fraction
+	_countdown_fill_style.bg_color = WARNING_RED if fraction <= 0.25 else GOLD
+	_countdown_track.show()
 
 
-func hide_bird_timer() -> void:
-	_bird_timer_track.hide()
+func hide_countdown_bar() -> void:
+	_countdown_track.hide()
 
 
 func show_toast(message: String) -> void:
@@ -138,27 +138,27 @@ func _build() -> void:
 	_cue = _label("Keep the pole level", 14, CREAM)
 	top_box.add_child(_cue)
 
-	_bird_timer_track = Panel.new()
-	_bird_timer_track.name = "Bird Countdown"
-	_bird_timer_track.size = Vector2(40.0, BIRD_TIMER_HEIGHT)
-	_bird_timer_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_countdown_track = Panel.new()
+	_countdown_track.name = "Reaction Countdown"
+	_countdown_track.size = Vector2(40.0, COUNTDOWN_BAR_HEIGHT)
+	_countdown_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var timer_style := StyleBoxFlat.new()
 	timer_style.bg_color = PANEL
 	timer_style.set_border_width_all(0)
 	timer_style.set_corner_radius_all(2)
-	_bird_timer_track.add_theme_stylebox_override("panel", timer_style)
-	root.add_child(_bird_timer_track)
-	_bird_timer_fill = Panel.new()
-	_bird_timer_fill.position = Vector2.ZERO
-	_bird_timer_fill.size = Vector2(40.0, BIRD_TIMER_HEIGHT)
-	_bird_timer_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bird_timer_fill_style = StyleBoxFlat.new()
-	_bird_timer_fill_style.bg_color = GOLD
-	_bird_timer_fill_style.set_border_width_all(0)
-	_bird_timer_fill_style.set_corner_radius_all(2)
-	_bird_timer_fill.add_theme_stylebox_override("panel", _bird_timer_fill_style)
-	_bird_timer_track.add_child(_bird_timer_fill)
-	_bird_timer_track.hide()
+	_countdown_track.add_theme_stylebox_override("panel", timer_style)
+	root.add_child(_countdown_track)
+	_countdown_fill = Panel.new()
+	_countdown_fill.position = Vector2.ZERO
+	_countdown_fill.size = Vector2(40.0, COUNTDOWN_BAR_HEIGHT)
+	_countdown_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_countdown_fill_style = StyleBoxFlat.new()
+	_countdown_fill_style.bg_color = GOLD
+	_countdown_fill_style.set_border_width_all(0)
+	_countdown_fill_style.set_corner_radius_all(2)
+	_countdown_fill.add_theme_stylebox_override("panel", _countdown_fill_style)
+	_countdown_track.add_child(_countdown_fill)
+	_countdown_track.hide()
 
 	_control_hint = PanelContainer.new()
 	_control_hint.name = "Control Hint"

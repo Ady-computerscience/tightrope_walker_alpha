@@ -4,6 +4,7 @@ extends Node3D
 const Rules := preload("res://scripts/tightrope_rules.gd")
 const HudScene := preload("res://scripts/game_hud.gd")
 const BirdScene := preload("res://assets/actg/swamphen/australasian_swamphen.glb")
+const FlagScene := preload("res://assets/quaternius/flag/flag.glb")
 const BIRD_FLY_ANIMATION := "australasian_swamphen_fly"
 const INTRO_DURATION := 9.2
 const INTRO_SKIP_DURATION := 0.65
@@ -20,6 +21,8 @@ const POLE_WAIST_Y := 1.15
 const POLE_FRONT_Z := -0.42
 const BIRD_HOVER_HEIGHT := 3.5
 const BIRD_TIMER_GAP_PIXELS := 5.0
+const GUST_TIMER_GAP_PIXELS := 8.0
+const GUST_TIMER_WIDTH := 100.0
 const STORIES := [
 	"The skyline waits ahead. Find your balance and take the first step.",
 	"Even the birds doubt you. Let them watch you prove them wrong.",
@@ -37,6 +40,7 @@ var kenney_decor_count := 0
 var pole: MeshInstance3D
 var ropes: Array = []
 var birds: Array[Node3D] = []
+var gust_flag: Node3D
 var snow: CPUParticles3D
 var visual_z := -4.0
 var step_from := -4.0
@@ -111,13 +115,14 @@ func _process(delta: float) -> void:
 		if Input.is_action_just_pressed("release"):
 			_release()
 		if rules.state == "walking":
-			for event in rules.update(dt, _lean_input()):
+			for event in rules.update(dt, _lean_input(), _gust_response_input()):
 				match event["type"]:
 					"birds": hud.show_toast("Birds incoming!")
 					"birds_arrived": hud.show_toast("Lean toward the middle bird")
 					"birds_pass": hud.show_toast("Birds passed")
 					"bird_gust": hud.show_toast("Bird gust! Keep your balance")
-					"gust": hud.show_toast("Wind changes direction")
+					"gust_pass": hud.show_toast("Gust passed")
+					"gust_fail": hud.show_toast("Missed gust!")
 					"fall":
 						fall_elapsed = 0.0
 						step_duration = 0.0
@@ -136,7 +141,8 @@ func _process(delta: float) -> void:
 	_update_birds()
 	_update_ropes()
 	_update_camera(dt)
-	_update_bird_timer()
+	_update_gust_visual()
+	_update_reaction_timer()
 	snow.position = camera.position + Vector3(0.0, 16.0, -18.0)
 	_update_hud()
 
@@ -196,7 +202,8 @@ func _restart() -> void:
 	fall_elapsed = 0.0
 	hud.set_paused(false)
 	hud.hide_win()
-	hud.hide_bird_timer()
+	hud.hide_countdown_bar()
+	gust_flag.hide()
 	hud.show_caption("")
 	hud.show_control_hint()
 	_announce_tower()
@@ -220,6 +227,14 @@ func _toggle_pause() -> void:
 
 func _lean_input() -> float:
 	return Input.get_axis("lean_left", "lean_right")
+
+
+func _gust_response_input() -> int:
+	if Input.is_action_just_pressed("lean_left"):
+		return -1
+	if Input.is_action_just_pressed("lean_right"):
+		return 1
+	return 0
 
 
 func _step_pressed() -> bool:
@@ -282,23 +297,45 @@ func _update_birds() -> void:
 				bird.rotation.y = -PI * 0.5 * rules.bird_dirs[index]
 
 
-func _update_bird_timer() -> void:
-	if rules.stage_kind() != "Birds" or rules.bird_phase != "warn" or rules.state != "walking":
-		hud.hide_bird_timer()
+func _update_gust_visual() -> void:
+	gust_flag.hide()
+	if mode != "walking":
 		return
-	var center_position := birds[1].global_position
-	if camera.is_position_behind(center_position):
-		hud.hide_bird_timer()
+	hud.show_caption("")
+	if rules.state != "walking" or not rules.on_rope:
 		return
-	var screen_position := camera.unproject_position(center_position)
-	if not get_viewport().get_visible_rect().has_point(screen_position):
-		hud.hide_bird_timer()
+	if rules.wind_phase == "cue" or rules.wind_phase == "react":
+		gust_flag.position.x = float(rules.wind_flag_side) * 4.5
+		gust_flag.show()
+
+
+func _update_reaction_timer() -> void:
+	if rules.state != "walking":
+		hud.hide_countdown_bar()
 		return
-	var left_position := camera.unproject_position(birds[0].global_position)
-	var right_position := camera.unproject_position(birds[2].global_position)
-	var timer_position := Vector2((left_position.x + right_position.x) * 0.5, screen_position.y + BIRD_TIMER_GAP_PIXELS)
-	var timer_width := absf(right_position.x - left_position.x) * 0.5
-	hud.show_bird_timer(timer_position, timer_width, rules.bird_timer / Rules.BIRD_WARN)
+	if rules.stage_kind() == "Birds" and rules.bird_phase == "warn":
+		var center_position := birds[1].global_position
+		if camera.is_position_behind(center_position):
+			hud.hide_countdown_bar()
+			return
+		var screen_position := camera.unproject_position(center_position)
+		if not get_viewport().get_visible_rect().has_point(screen_position):
+			hud.hide_countdown_bar()
+			return
+		var left_position := camera.unproject_position(birds[0].global_position)
+		var right_position := camera.unproject_position(birds[2].global_position)
+		var timer_position := Vector2((left_position.x + right_position.x) * 0.5, screen_position.y + BIRD_TIMER_GAP_PIXELS)
+		var timer_width := absf(right_position.x - left_position.x) * 0.5
+		hud.show_countdown_bar(timer_position, timer_width, rules.bird_timer / Rules.BIRD_WARN)
+	elif rules.on_rope and rules.wind_phase == "react":
+		var flag_position := gust_flag.global_position
+		if camera.is_position_behind(flag_position):
+			hud.hide_countdown_bar()
+			return
+		var screen_position := camera.unproject_position(flag_position)
+		hud.show_countdown_bar(screen_position + Vector2(0.0, GUST_TIMER_GAP_PIXELS), GUST_TIMER_WIDTH, rules.wind_timer / Rules.WIND_RESPONSE_TIME)
+	else:
+		hud.hide_countdown_bar()
 
 
 func _update_ropes() -> void:
@@ -371,7 +408,7 @@ func _update_hud() -> void:
 		cue = "W / O: step onto the rope"
 	else:
 		match rules.stage_kind():
-			"Wind": cue = "Wind: %s  %.0f%%" % ["RIGHT" if rules.wind_dir > 0 else "LEFT", rules.wind_ramp * 100.0]
+			"Wind": cue = "Watch for the flag"
 			"Birds": cue = "Center bird: Q / P  %.1fs" % rules.bird_timer if rules.bird_phase == "warn" else ("Bird gust!" if rules.bird_gust_timer > 0.0 else ("Birds incoming" if rules.bird_phase == "approach" else "Watch for the birds"))
 			"Tension": cue = "Tension: %.0f%%  •  Space to release" % [rules.tension * 100.0]
 			"Sway": cue = "Sway: %.0f%%  •  Step near center" % [rules.sway * 100.0]
@@ -402,6 +439,16 @@ func _build_world() -> void:
 	camera.current = true
 	camera.fov = 68.0
 	add_child(camera)
+	gust_flag = FlagScene.instantiate() as Node3D
+	gust_flag.name = "Gust Warning Flag"
+	gust_flag.scale = Vector3.ONE * 0.7
+	gust_flag.position = Vector3(4.5, -0.8, -9.0)
+	gust_flag.visible = false
+	camera.add_child(gust_flag)
+	var flag_mesh := gust_flag.find_child("Flag", true, false) as MeshInstance3D
+	if flag_mesh != null:
+		flag_mesh.set_surface_override_material(0, _material(Color("7c829e")))
+		flag_mesh.set_surface_override_material(1, _material(Color("ff6a58")))
 	_build_rooftop_skyscrapers()
 	_build_cityscape()
 	_build_city_ground()

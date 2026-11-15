@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://cohdy30eiruvh"
-path="res://.godot/imported/flag.glb-66708fe7de5208be1073a81ee650ea5a.scn"
+uid="uid://du1kaq65y3llu"
+path="res://.godot/imported/flag.glb-269e036738dfc98a6f280d503c394cd9.scn"
 
 [deps]
 
-source_file="res://assets/kenney/platformer_kit/flag.glb"
-dest_files=["res://.godot/imported/flag.glb-66708fe7de5208be1073a81ee650ea5a.scn"]
+source_file="res://assets/quaternius/flag/flag.glb"
+dest_files=["res://.godot/imported/flag.glb-269e036738dfc98a6f280d503c394cd9.scn"]
 
 [params]
 

@@ -13,9 +13,13 @@ const LEAN_POWER := 1.6
 const DAMPING := 1.8
 const LEAN_SMOOTHING := 6.0
 const WOBBLE := 0.28
-const WIND_ENABLED := false
+const WIND_ENABLED := true
 const WIND_PUSH := 0.9
 const WIND_RAMP_TIME := 1.2
+const WIND_CUE_DURATION := 0.45
+const WIND_RESPONSE_TIME := 1.0
+const WIND_BLOW_DURATION := 0.35
+const WIND_FAIL_SHOVE := 7.0
 const BIRD_APPROACH := 1.3
 const BIRD_WARN := 1.0
 const BIRD_REST := 1.6
@@ -50,8 +54,13 @@ var lean_smooth := 0.0
 var last_step_at := -10.0
 var last_release_at := -10.0
 var wind_dir := 1
-var wind_timer := 0.6
+var wind_flag_side := 1
+var wind_phase := "rest"
+var wind_timer := 2.5
 var wind_ramp := 0.0
+var wind_response := 0
+var wind_attempts := 0
+var wind_passes := 0
 var bird_phase := "rest"
 var bird_timer := 1.8
 var bird_dir := 1
@@ -97,8 +106,6 @@ static func rope_at(z: float) -> Dictionary:
 
 
 func stage_kind() -> String:
-	if tower == 1 and not WIND_ENABLED:
-		return "Balance"
 	return STAGES[tower - 1]
 
 
@@ -110,7 +117,7 @@ static func sway_safe(value: float) -> bool:
 	return absf(value) < SWAY_WINDOW
 
 
-func update(delta: float, lean: float) -> Array[Dictionary]:
+func update(delta: float, lean: float, gust_response: int = 0) -> Array[Dictionary]:
 	var events: Array[Dictionary] = []
 	if state != "walking":
 		return events
@@ -124,23 +131,16 @@ func update(delta: float, lean: float) -> Array[Dictionary]:
 		return events
 	stage_time += dt
 	var stage_push := sin(time * 1.7) * WOBBLE + sin(time * 3.1 + 1.0) * WOBBLE * 0.45
+	if WIND_ENABLED:
+		stage_push += _update_wind(dt, gust_response, events)
 	match stage_kind():
-		"Wind":
-			wind_timer -= dt
-			if wind_timer <= 0.0:
-				wind_dir = _random_sign()
-				wind_timer = _rng.randf_range(3.2, 4.6)
-				wind_ramp = 0.0
-				events.append({"type": "gust", "dir": wind_dir})
-			wind_ramp = minf(1.0, wind_ramp + dt / WIND_RAMP_TIME)
-			stage_push += wind_dir * WIND_PUSH * wind_ramp
 		"Birds":
 			if bird_gust_timer > 0.0:
 				bird_gust_timer = maxf(0.0, bird_gust_timer - dt)
 				stage_push -= bird_dir * BIRD_GUST_PUSH
 			var bird_had_time := bird_timer > 0.0
 			bird_timer -= dt
-			if bird_phase == "rest" and bird_timer <= 0.0:
+			if bird_phase == "rest" and bird_timer <= 0.0 and wind_phase == "rest":
 				bird_phase = "approach"
 				bird_timer = BIRD_APPROACH
 				bird_entry_side = _random_sign()
@@ -187,6 +187,55 @@ func update(delta: float, lean: float) -> Array[Dictionary]:
 		tilt = clampf(tilt, -1.0, 1.0)
 		_fall("balance", events)
 	return events
+
+
+func _update_wind(dt: float, response: int, events: Array[Dictionary]) -> float:
+	var gust_push := 0.0
+	var had_time := wind_timer > 0.0
+	if wind_phase == "rest":
+		if stage_kind() == "Birds" and bird_phase != "rest":
+			return 0.0
+		wind_timer -= dt
+		if wind_timer <= 0.0:
+			wind_dir = _random_sign()
+			wind_flag_side = -wind_dir
+			wind_phase = "cue"
+			wind_timer = WIND_CUE_DURATION
+			wind_ramp = 0.0
+			wind_response = 0
+			events.append({"type": "gust_cue", "side": wind_flag_side})
+	elif wind_phase == "cue":
+		wind_timer -= dt
+		if wind_timer <= 0.0:
+			wind_phase = "react"
+			wind_timer = WIND_RESPONSE_TIME
+			wind_attempts += 1
+			events.append({"type": "gust", "dir": wind_dir})
+	elif wind_phase == "react":
+		wind_timer -= dt
+		wind_ramp = minf(1.0, wind_ramp + dt / WIND_RAMP_TIME)
+		gust_push = wind_dir * WIND_PUSH * wind_ramp
+		if had_time and response != 0:
+			wind_response = signi(response)
+		if wind_response != 0 or wind_timer <= 0.0:
+			var passed := wind_response == -wind_flag_side
+			if passed:
+				wind_passes += 1
+				events.append({"type": "gust_pass"})
+			else:
+				tilt_vel += wind_dir * WIND_FAIL_SHOVE
+				events.append({"type": "gust_fail", "dir": wind_dir})
+			wind_phase = "blow"
+			wind_timer = WIND_BLOW_DURATION
+	elif wind_phase == "blow":
+		wind_timer -= dt
+		wind_ramp = minf(1.0, wind_ramp + dt / WIND_RAMP_TIME)
+		gust_push = wind_dir * WIND_PUSH * wind_ramp
+		if wind_timer <= 0.0:
+			wind_phase = "rest"
+			wind_timer = _rng.randf_range(3.2, 4.6)
+			wind_ramp = 0.0
+	return gust_push
 
 
 func try_step() -> String:
@@ -270,8 +319,11 @@ func _reset_stage() -> void:
 	last_step_at = -10.0
 	last_release_at = -10.0
 	wind_dir = _random_sign()
-	wind_timer = 0.6
+	wind_flag_side = -wind_dir
+	wind_phase = "rest"
+	wind_timer = 2.5
 	wind_ramp = 0.0
+	wind_response = 0
 	bird_phase = "rest"
 	bird_timer = 1.8
 	bird_dir = 1

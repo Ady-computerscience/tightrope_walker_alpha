@@ -81,9 +81,9 @@ func _process(_delta: float) -> bool:
 	camera.position = game.get("walker").position + Vector3(7.0, 6.5, 15.0)
 	camera.look_at(game.get("walker").position + Vector3(0.0, 1.0, -12.0))
 	var bird_hud: GameHUD = game.get("hud")
-	var timer_track: Panel = bird_hud.get("_bird_timer_track")
-	var timer_fill: Panel = bird_hud.get("_bird_timer_fill")
-	game.call("_update_bird_timer")
+	var timer_track: Panel = bird_hud.get("_countdown_track")
+	var timer_fill: Panel = bird_hud.get("_countdown_fill")
+	game.call("_update_reaction_timer")
 	var projected_bird := camera.unproject_position(center_bird.global_position)
 	var projected_left := camera.unproject_position(bird_models[0].global_position)
 	var projected_right := camera.unproject_position(bird_models[2].global_position)
@@ -97,26 +97,26 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	bird_rules.bird_timer = Rules.BIRD_WARN * 0.5
-	game.call("_update_bird_timer")
+	game.call("_update_reaction_timer")
 	if not is_equal_approx(timer_fill.size.x, expected_width * 0.5) or fill_style.bg_color != GameHUD.GOLD:
 		printerr("FAIL: bird countdown did not shrink at half time")
 		quit(1)
 		return true
 	bird_rules.bird_timer = Rules.BIRD_WARN * 0.25
-	game.call("_update_bird_timer")
+	game.call("_update_reaction_timer")
 	if not is_equal_approx(timer_fill.size.x, expected_width * 0.25) or fill_style.bg_color != GameHUD.WARNING_RED:
 		printerr("FAIL: bird countdown did not turn red at 75 percent elapsed")
 		quit(1)
 		return true
 	bird_rules.bird_timer = 0.0
-	game.call("_update_bird_timer")
+	game.call("_update_reaction_timer")
 	if timer_track.visible:
 		printerr("FAIL: bird countdown remained visible when time ran out")
 		quit(1)
 		return true
 	bird_rules.bird_phase = "rest"
 	game.call("_update_birds")
-	game.call("_update_bird_timer")
+	game.call("_update_reaction_timer")
 	camera.global_transform = saved_camera_transform
 	if timer_track.visible:
 		printerr("FAIL: bird countdown remained visible after the warning")
@@ -178,6 +178,75 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	var startup_rules: TightropeRules = game.get("rules")
+	var gust_flag: Node3D = game.get("gust_flag")
+	if gust_flag == null or gust_flag.get_parent() != camera or gust_flag.get_child_count() == 0 or gust_flag.visible or not is_equal_approx(gust_flag.scale.y, 0.7):
+		printerr("FAIL: imported gust flag is missing or visible before the cue")
+		quit(1)
+		return true
+	var gust_flag_mesh := gust_flag.find_child("Flag", true, false) as MeshInstance3D
+	if gust_flag_mesh == null or gust_flag_mesh.mesh.get_surface_count() != 2 or gust_flag_mesh.get_surface_override_material(0).albedo_color != Color("7c829e") or gust_flag_mesh.get_surface_override_material(1).albedo_color != Color("ff6a58"):
+		printerr("FAIL: Quaternius flag did not use the city palette")
+		quit(1)
+		return true
+	startup_rules.on_rope = true
+	startup_rules.wind_phase = "cue"
+	startup_rules.wind_timer = Rules.WIND_CUE_DURATION - 0.05
+	startup_rules.wind_flag_side = -1
+	game.call("_update_gust_visual")
+	game.call("_update_reaction_timer")
+	if not gust_flag.visible or gust_flag.position.x >= 0.0 or timer_track.visible:
+		printerr("FAIL: gust flag did not appear on the left during the cue")
+		quit(1)
+		return true
+	startup_rules.wind_timer = Rules.WIND_CUE_DURATION - 0.12
+	game.call("_update_gust_visual")
+	if not gust_flag.visible:
+		printerr("FAIL: gust flag blinked off during the cue")
+		quit(1)
+		return true
+	startup_rules.wind_flag_side = 1
+	game.call("_update_gust_visual")
+	if not gust_flag.visible or gust_flag.position.x <= 0.0:
+		printerr("FAIL: gust flag did not appear on the right during the cue")
+		quit(1)
+		return true
+	startup_rules.wind_phase = "react"
+	startup_rules.wind_dir = 1
+	startup_rules.wind_flag_side = -1
+	startup_rules.wind_timer = Rules.WIND_RESPONSE_TIME
+	game.call("_update_gust_visual")
+	game.call("_update_reaction_timer")
+	game.call("_update_hud")
+	var gust_caption: Label = hud.get("_caption")
+	var gust_status: Label = hud.get("_cue")
+	var projected_flag := camera.unproject_position(gust_flag.global_position)
+	if not gust_flag.visible or gust_caption.visible or gust_status.text.contains("Gust from") or not timer_track.visible or not is_equal_approx(timer_track.position.x + timer_track.size.x * 0.5, projected_flag.x) or not is_equal_approx(timer_track.position.y, projected_flag.y + 8.0) or not is_equal_approx(timer_track.size.x, 100.0) or not is_equal_approx(timer_fill.size.x, 100.0):
+		printerr("FAIL: gust warning showed direction text or misplaced the flag countdown")
+		quit(1)
+		return true
+	startup_rules.wind_timer = Rules.WIND_RESPONSE_TIME * 0.5
+	game.call("_update_reaction_timer")
+	if not is_equal_approx(timer_fill.size.x, 50.0) or fill_style.bg_color != GameHUD.GOLD:
+		printerr("FAIL: gust countdown did not shrink at half time")
+		quit(1)
+		return true
+	startup_rules.wind_timer = Rules.WIND_RESPONSE_TIME * 0.25
+	game.call("_update_reaction_timer")
+	if not is_equal_approx(timer_fill.size.x, 25.0) or fill_style.bg_color != GameHUD.WARNING_RED:
+		printerr("FAIL: gust countdown did not turn red at 75 percent elapsed")
+		quit(1)
+		return true
+	startup_rules.wind_phase = "blow"
+	game.call("_update_gust_visual")
+	game.call("_update_reaction_timer")
+	if timer_track.visible or gust_flag.visible:
+		printerr("FAIL: gust countdown or flag remained visible after response")
+		quit(1)
+		return true
+	startup_rules.on_rope = false
+	startup_rules.wind_phase = "rest"
+	startup_rules.wind_timer = 2.5
+	game.call("_update_gust_visual")
 	startup_rules.last_step_at = startup_rules.time
 	game.call("_step", "left")
 	if game.get("has_taken_first_step"):
@@ -345,6 +414,12 @@ func _process(_delta: float) -> bool:
 	hud.call("_process", 11.0)
 	if hint.visible or not game.get("has_taken_first_step"):
 		printerr("FAIL: control hint reappeared after fall respawn")
+		quit(1)
+		return true
+	hud.show_win(25.0, 1, 25.0)
+	var win_text: Label = hud.get("_win_text")
+	if not win_text.text.contains("Time: 25.0 s") or not win_text.text.contains("Falls: 1") or win_text.text.contains("Gust"):
+		printerr("FAIL: win card contains gust result text or omits time and falls")
 		quit(1)
 		return true
 	print("PASS: main scene initializes and step action works")

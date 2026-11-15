@@ -8,7 +8,7 @@ Open `project.godot` in Godot 4.7 and run the project. Press **W** to step with 
 
 The control hint appears at the bottom only when the game starts or is explicitly restarted. It stays visible until the first successful step, then hides ten seconds later.
 
-The four towers currently challenge balance, birds, tension, and sway. Wind code is preserved but disabled for now. A fall returns the walker to the last reached tower. The final step opens a win card; **Stargaze** plays the ending camera move.
+The first rope section introduces Gust Warning. A flag appears on the side the gust will come from. Press **Q/P** to lean away from the flag during the one-second response window. Leaning toward the flag or missing the response triggers a strong gust that makes the walker fall. Gust Warning remains active on later sections alongside their other interruptions. A fall returns the walker to the last reached tower. The final step opens a win card; **Stargaze** plays the ending camera move.
 
 ## Tests
 
@@ -20,7 +20,7 @@ godot --headless --path . --script res://tests/test_rules.gd
 godot --headless --path . --script res://tests/test_scene.gd
 ```
 
-The rules test covers path layout, cooldowns, tower transitions, checkpoint behavior, birds, tension, sway, deterministic seeds, and two full successful runs. The scene test checks skyscraper construction, HUD creation, and step wiring.
+The rules test covers path layout, cooldowns, tower transitions, checkpoint behavior, gust warnings, birds, tension, sway, deterministic seeds, and two full successful runs. The scene test checks skyscraper construction, HUD creation, gust flag placement, and step wiring.
 
 ## Source and current limits
 
