@@ -1,22 +1,48 @@
-# Tightrope Walker — Godot port
+# Tightrope Walker
 
-A Godot 4.7 single-player port of the supplied Roblox game. The balance and stage rules are ported from `TightropeRules.luau`; the main scene uses Grab3D’s stylized elderly man as the walker and Kenney Holiday Kit models as winter decorations, alongside reactive ropes, HUD, snow, birds, and camera. The playable course now uses five detailed rooftop skyscrapers above a city street. The original exported world OBJ and PNG assets remain in `assets/world` as source material.
+A single-player balance game that trains attention, built in Godot 4.7 (GDScript). You are a stuntman crossing a tightrope between rooftop towers while short attention tasks interrupt the walk. Reach the last tower without falling.
+
+The project was prototyped in Roblox Studio and ported to Godot so the team could use git, branches and pull requests. The balance and stage rules live in one pure-logic script (`scripts/tightrope_rules.gd`) with headless tests; `scripts/game.gd` builds the world, camera and input at runtime, and `scripts/game_hud.gd` draws the HUD. The walker is Grab3D's stylized elderly man; rooftop props are from the Kenney Holiday Kit. The original Roblox world export (OBJ and PNG) is kept in `assets/world` as source material and is not loaded by the game.
 
 ## Play
 
-Open `project.godot` in Godot 4.7 and run the project. Press **W** to step with the left foot or **O** to step with the right foot; lean with **Q/P**. Release tension with **Space** or **E**, pause with **Escape**, and restart with **R**. During a fall, press **Space** to respawn immediately. The gamepad step button alternates feet automatically.
+Open `project.godot` in Godot 4.7 and run the project (Play button, F5 on Windows/Linux, Cmd+B on macOS).
 
-The run timer stays visible in the top HUD banner from the opening through falls, pause, and the finish screen. The banner always shows W/O stepping and Q/P leaning controls. A Space prompt appears only when Space can release wire tension or respawn after a fall. Reaching a tower checkpoint shows a large, centered `TOWER <number>: <Minigame>` title below the banner.
+The game opens with a camera pan over the city. Press **Space** to skip it, or any step key after two seconds.
 
-The first rope section introduces Gust Warning. A flag appears on the side the gust will come from. Press **Q/P** to lean away from the flag during the one-second response window. Leaning toward the flag or missing the response triggers a strong gust that makes the walker fall. Gust Warning remains active on later sections alongside their other interruptions. A fall returns the walker to the last reached tower. The final step opens a win card; **Stargaze** plays the ending camera move.
+### Controls
 
-The four crossings move from blue daylight to orange and pink sunset, purple dusk, and night. The sun descends during the first crossing and sets during the second; the moon rises through the third and fourth. Sky colors, city lighting, fog, and the dark overlay blend when a new stage begins.
+| Action | Keyboard | Gamepad |
+|---|---|---|
+| Step with the left / right foot | **W** / **O** | **A** (alternates feet automatically) |
+| Lean left / right | **Q** / **P** | Left stick |
+| Release wire tension | **Space** or **E** | **X** |
+| Respawn immediately during a fall | **Space** | |
+| Pause / resume | **Esc** | **Start** |
+| Restart the whole run | **R** | |
 
-The wire tension stage shows a corner gauge with green, yellow, and red ranges. Its needle follows the current tension and drops when the player releases the wire. When the needle reaches the red range at 80%, a countdown bar appears beneath the gauge and shrinks toward the snap point, turning red in its final quarter. The gauge remains visible during the final crossing, where gust warnings, birds, wire tension, and sway all run together. Wind and bird response windows take turns so their cues do not overlap. The gauge uses a [CC0 semicircular HUD asset](https://freegameui.net/assets/gauges/gauge_arc-half_cyber-cyan_01/) as its base.
+Feet do not have to alternate on the keyboard. Balance and interruptions only begin once you take your first step onto the rope, so you are safe while standing on a roof.
+
+### The course
+
+Four crossings of nine steps each. Reaching a tower sets a checkpoint and shows a `TOWER <n>: <STAGE>` title. The top banner shows the tower, step count, stage name, run timer and a cue line that tells you what to watch for. A Space prompt appears only when Space does something (release tension, or respawn after a fall). Each interruption ends with a `PASS` or `MISS` toast (`FAIL` when the wire snaps).
+
+Balance is an inverted pendulum: the further you tilt, the faster you tip. Small, early corrections with **Q/P** keep the pole level. If the tilt reaches the limit you fall to the street; press **Space** (or wait) to respawn at the last tower you reached. Falls are counted.
+
+Each crossing adds an interruption and keeps the earlier ones:
+
+1. **Gust Warning** (every crossing). A flag appears for a moment on the side the gust will come from, then a one-second response window opens. Your first lean decides: lean **away from the flag** to pass. Leaning toward it, or not leaning in time, triggers a strong gust that knocks you off. Gusts come every few seconds and take turns with the birds so cues never overlap.
+2. **Flanker Birds** (crossings 2 and 4). Three birds fly in from one side. When they arrive you have one second to lean **the way the centre bird points**. The two outer birds sometimes point the other way; ignore them. Your first lean counts. A gust accompanies every bird pass; the correct lean rides it out, a wrong or missing lean drops you.
+3. **Wire Tension** (crossings 3 and 4). The corner gauge rises steadily and jumps with each step, and the wire jitters more as it climbs. Press **Space** to release the tension (half-second cooldown). When the needle reaches the red range at 80% a countdown bar appears under the gauge; if it runs out the wire snaps and you fall.
+4. **Sway** (crossing 4). The rope swings side to side while all three interruptions run together. Stepping while the rope is away from centre shoves you, so time your steps to the sway.
+
+The sky runs from blue daylight through sunset and dusk to night across the four crossings: the sun sets during the second crossing and the moon rises through the third and fourth.
+
+Stepping off the last rope opens the finish card with your time, falls and best time this session. **Play again** restarts; **Stargaze** plays the ending camera move.
 
 ## Tests
 
-Run the import once on a fresh checkout, then run the tests:
+Run the import once on a fresh checkout, then run the tests (replace `godot` with the path to your Godot 4.7 binary, for example `/Applications/Godot.app/Contents/MacOS/Godot` on macOS):
 
 ```sh
 godot --headless --path . --editor --quit
@@ -24,8 +50,8 @@ godot --headless --path . --script res://tests/test_rules.gd
 godot --headless --path . --script res://tests/test_scene.gd
 ```
 
-The rules test covers path layout, cooldowns, tower transitions, checkpoint behavior, gust warnings, birds, tension, sway, deterministic seeds, and two full successful runs. The scene test checks skyscraper construction, the four sky stages and celestial motion, HUD creation, gust flag placement, and step wiring.
+`test_rules.gd` covers path layout, cooldowns, tower transitions, checkpoints, gust warnings, birds, tension, sway, deterministic seeds and two full successful runs. `test_scene.gd` checks skyscraper construction, the four sky stages and celestial motion, HUD creation, gust flag placement and step wiring.
 
-## Source and current limits
+## Current limits
 
-The Roblox export supplies meshes and textures but no audio assets, rigged player model, or complete Roblox place. This port uses a [Grab3D elderly man](https://grab3d.com/models/characters/elderly-man/) and has no multiplayer or audio. The imported OBJ has static decoration; ropes are separately rendered and animated by Godot. The existing Luau scripts remain in the sibling `TightropeWalker_RobloxStudio` folder.
+No audio yet, no difficulty settings, no title or tutorial screen, and the finish card does not yet break results down per interruption. Single player only.
