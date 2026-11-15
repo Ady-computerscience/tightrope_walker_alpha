@@ -12,7 +12,7 @@ The first rope section introduces Gust Warning. A flag appears on the side the g
 
 The four crossings move from blue daylight to orange and pink sunset, purple dusk, and night. The sun descends during the first crossing and sets during the second; the moon rises through the third and fourth. Sky colors, city lighting, fog, and the dark overlay blend when a new stage begins.
 
-The wire tension stage shows a corner gauge with green, yellow, and red ranges. Its needle follows the current tension and drops when the player releases the wire. The gauge remains visible during the final crossing, where gust warnings, birds, wire tension, and sway all run together. Wind and bird response windows take turns so their cues do not overlap. The gauge uses a [CC0 semicircular HUD asset](https://freegameui.net/assets/gauges/gauge_arc-half_cyber-cyan_01/) as its base.
+The wire tension stage shows a corner gauge with green, yellow, and red ranges. Its needle follows the current tension and drops when the player releases the wire. When the needle reaches the red range at 80%, a countdown bar appears beneath the gauge and shrinks toward the snap point, turning red in its final quarter. The gauge remains visible during the final crossing, where gust warnings, birds, wire tension, and sway all run together. Wind and bird response windows take turns so their cues do not overlap. The gauge uses a [CC0 semicircular HUD asset](https://freegameui.net/assets/gauges/gauge_arc-half_cyber-cyan_01/) as its base.
 
 ## Tests
 

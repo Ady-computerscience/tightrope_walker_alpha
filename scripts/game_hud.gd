@@ -30,6 +30,9 @@ var _wire_gauge_panel: PanelContainer
 var _countdown_track: Panel
 var _countdown_fill: Panel
 var _countdown_fill_style: StyleBoxFlat
+var _wire_countdown_track: Panel
+var _wire_countdown_fill: Panel
+var _wire_countdown_fill_style: StyleBoxFlat
 var _caption: Label
 var _toast: Label
 var _toast_generation := 0
@@ -96,8 +99,26 @@ func show_countdown_bar(screen_position: Vector2, width: float, remaining_fracti
 		clampf(screen_position.y, minimum_y, maxf(minimum_y, viewport_size.y - COUNTDOWN_BAR_HEIGHT - 12.0))
 	)
 	_countdown_fill.size.x = timer_width * fraction
-	_countdown_fill_style.bg_color = WARNING_RED if fraction <= 0.25 else GOLD
+	_countdown_fill_style.bg_color = WARNING_RED if fraction <= 0.2501 else GOLD
 	_countdown_track.show()
+
+
+func show_wire_countdown_bar(remaining_fraction: float) -> void:
+	var fraction := clampf(remaining_fraction, 0.0, 1.0)
+	if fraction <= 0.0:
+		hide_wire_countdown_bar()
+		return
+	var gauge_rect := _wire_gauge_panel.get_global_rect()
+	var timer_width := gauge_rect.size.x - 16.0
+	_wire_countdown_track.position = Vector2(gauge_rect.position.x + 8.0, gauge_rect.end.y + 8.0)
+	_wire_countdown_track.size.x = timer_width
+	_wire_countdown_fill.size.x = timer_width * fraction
+	_wire_countdown_fill_style.bg_color = WARNING_RED if fraction <= 0.2501 else GOLD
+	_wire_countdown_track.show()
+
+
+func hide_wire_countdown_bar() -> void:
+	_wire_countdown_track.hide()
 
 
 func hide_countdown_bar() -> void:
@@ -239,6 +260,19 @@ func _build() -> void:
 	_countdown_fill.add_theme_stylebox_override("panel", _countdown_fill_style)
 	_countdown_track.add_child(_countdown_fill)
 	_countdown_track.hide()
+	_wire_countdown_track = Panel.new()
+	_wire_countdown_track.name = "Wire Reaction Countdown"
+	_wire_countdown_track.size = Vector2(40.0, COUNTDOWN_BAR_HEIGHT)
+	_wire_countdown_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wire_countdown_track.add_theme_stylebox_override("panel", timer_style.duplicate())
+	root.add_child(_wire_countdown_track)
+	_wire_countdown_fill = Panel.new()
+	_wire_countdown_fill.size = Vector2(40.0, COUNTDOWN_BAR_HEIGHT)
+	_wire_countdown_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wire_countdown_fill_style = _countdown_fill_style.duplicate() as StyleBoxFlat
+	_wire_countdown_fill.add_theme_stylebox_override("panel", _wire_countdown_fill_style)
+	_wire_countdown_track.add_child(_wire_countdown_fill)
+	_wire_countdown_track.hide()
 
 	_control_hint = PanelContainer.new()
 	_control_hint.name = "Control Hint"

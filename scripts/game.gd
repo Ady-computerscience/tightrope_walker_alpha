@@ -325,6 +325,7 @@ func _restart() -> void:
 	hud.set_paused(false)
 	hud.hide_win()
 	hud.hide_countdown_bar()
+	hud.hide_wire_countdown_bar()
 	gust_flag.hide()
 	gust_snow.emitting = false
 	gust_snow.hide()
@@ -478,7 +479,12 @@ func _update_gust_visual() -> void:
 func _update_reaction_timer() -> void:
 	if rules.state != "walking":
 		hud.hide_countdown_bar()
+		hud.hide_wire_countdown_bar()
 		return
+	if rules.on_rope and rules.tension_enabled() and rules.tension >= Rules.TENSION_COUNTDOWN_START:
+		hud.show_wire_countdown_bar((1.0 - rules.tension) / (1.0 - Rules.TENSION_COUNTDOWN_START))
+	else:
+		hud.hide_wire_countdown_bar()
 	if rules.birds_enabled() and rules.bird_phase == "warn":
 		var center_position := birds[1].global_position
 		if camera.is_position_behind(center_position):

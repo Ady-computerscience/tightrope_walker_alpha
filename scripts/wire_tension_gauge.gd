@@ -32,6 +32,8 @@ func set_tension(value: float) -> void:
 	tension = clampf(value, 0.0, 1.0)
 	if not is_visible_in_tree():
 		displayed_tension = tension
+	elif displayed_tension < YELLOW_END and tension >= YELLOW_END:
+		displayed_tension = YELLOW_END
 	queue_redraw()
 
 
@@ -52,6 +54,6 @@ func _draw() -> void:
 
 
 func _draw_zone(from_fraction: float, to_fraction: float, color: Color) -> void:
-	var start := PI + PI * from_fraction + 0.025
-	var finish := PI + PI * to_fraction - 0.025
+	var start := PI + PI * from_fraction
+	var finish := PI + PI * to_fraction
 	draw_arc(CENTER, ARC_RADIUS, start, finish, 28, color, 13.0, true)

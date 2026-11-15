@@ -283,7 +283,7 @@ func _process(_delta: float) -> bool:
 	game.call("_update_hud")
 	var wire_gauge: WireTensionGauge = hud.get("_wire_gauge")
 	var wire_gauge_panel: PanelContainer = hud.get("_wire_gauge_panel")
-	if wire_gauge == null or wire_gauge_panel == null or wire_gauge_panel.visible:
+	if wire_gauge == null or wire_gauge_panel == null or wire_gauge_panel.visible or not is_equal_approx(WireTensionGauge.YELLOW_END, Rules.TENSION_COUNTDOWN_START):
 		printerr("FAIL: wire tension gauge is missing or visible before its stage")
 		quit(1)
 		return true
@@ -847,17 +847,63 @@ func _process(_delta: float) -> bool:
 	game.set("mode", "walking")
 	run.tower = 3
 	run.on_rope = true
-	run.tension = 0.8
+	game.call("_update_hud")
+	var wire_timer: Panel = hud.get("_wire_countdown_track")
+	var wire_timer_fill: Panel = hud.get("_wire_countdown_fill")
+	var wire_timer_color := wire_timer_fill.get_theme_stylebox("panel") as StyleBoxFlat
+	var gauge_rect := (hud.get("_wire_gauge_panel") as PanelContainer).get_global_rect()
+	run.tension = Rules.TENSION_COUNTDOWN_START - 0.01
+	game.call("_update_reaction_timer")
+	if wire_timer.visible:
+		printerr("FAIL: wire countdown appeared before the tension warning range")
+		quit(1)
+		return true
+	run.tension = Rules.TENSION_COUNTDOWN_START
+	game.call("_update_hud")
+	game.call("_update_reaction_timer")
+	var wire_timer_width := gauge_rect.size.x - 16.0
+	if not wire_timer.visible or (hud.get("_wire_gauge") as WireTensionGauge).displayed_tension < WireTensionGauge.YELLOW_END or not is_equal_approx(wire_timer.position.x + wire_timer.size.x * 0.5, gauge_rect.get_center().x) or not is_equal_approx(wire_timer.position.y, gauge_rect.end.y + 8.0) or not is_equal_approx(wire_timer.size.x, wire_timer_width) or not is_equal_approx(wire_timer_fill.size.x, wire_timer_width):
+		printerr("FAIL: wire countdown is not full-sized beneath the gauge")
+		quit(1)
+		return true
+	run.tension = lerpf(Rules.TENSION_COUNTDOWN_START, 1.0, 0.5)
+	game.call("_update_reaction_timer")
+	if not is_equal_approx(wire_timer_fill.size.x, wire_timer_width * 0.5) or wire_timer_color.bg_color != GameHUD.GOLD:
+		printerr("FAIL: wire countdown did not shrink to half remaining")
+		quit(1)
+		return true
+	run.tension = lerpf(Rules.TENSION_COUNTDOWN_START, 1.0, 0.75)
+	game.call("_update_reaction_timer")
+	if not is_equal_approx(wire_timer_fill.size.x, wire_timer_width * 0.25) or wire_timer_color.bg_color != GameHUD.WARNING_RED:
+		printerr("FAIL: wire countdown did not turn red in its final quarter")
+		quit(1)
+		return true
+	run.tower = 4
+	game.call("_update_hud")
+	game.call("_update_reaction_timer")
+	if not wire_timer.visible or not (hud.get("_wire_gauge_panel") as PanelContainer).visible:
+		printerr("FAIL: wire countdown and gauge did not remain available in stage four")
+		quit(1)
+		return true
+	run.wind_phase = "react"
+	run.wind_timer = Rules.WIND_RESPONSE_TIME * 0.5
+	game.call("_update_reaction_timer")
+	if not wire_timer.visible:
+		printerr("FAIL: wind response displaced the stage-four wire countdown")
+		quit(1)
+		return true
+	run.wind_phase = "rest"
 	game.call("_release")
 	var toast: Label = hud.get("_toast")
-	if toast.text != "PASS" or not is_zero_approx(run.tension):
-		printerr("FAIL: releasing wire tension did not show PASS")
+	game.call("_update_reaction_timer")
+	if toast.text != "PASS" or not is_zero_approx(run.tension) or wire_timer.visible:
+		printerr("FAIL: releasing wire tension did not show PASS and hide the countdown")
 		quit(1)
 		return true
 	run.tension = 0.995
 	game.call("_process", 0.1)
-	if run.fall_reason != "snap" or toast.text != "FAIL":
-		printerr("FAIL: snapped wire tension did not show FAIL")
+	if run.fall_reason != "snap" or toast.text != "FAIL" or wire_timer.visible:
+		printerr("FAIL: snapped wire tension did not show FAIL and clear its countdown")
 		quit(1)
 		return true
 	print("PASS: main scene initializes and step action works")
