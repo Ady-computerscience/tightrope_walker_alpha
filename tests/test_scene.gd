@@ -34,6 +34,22 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: the first crossing did not start under a blue daytime sky")
 		quit(1)
 		return true
+	var world_environment: Environment = game.get("_world_environment")
+	var emissive_materials: Array = game.get("_emissive_materials")
+	var halo_materials: Array = game.get("_halo_materials")
+	var local_lights: Array = game.get("_local_lights")
+	var day_glow: float = game.get("_lit_source_glow_factor")
+	if day_glow > 0.05 or world_environment.glow_intensity > 0.05 or emissive_materials.is_empty() or halo_materials.is_empty() or local_lights.is_empty():
+		printerr("FAIL: daytime glow was not minimal across light sources")
+		quit(1)
+		return true
+	var lit_material: StandardMaterial3D = emissive_materials[0]["material"]
+	var halo_material: StandardMaterial3D = halo_materials[0]["material"]
+	var local_light: OmniLight3D = local_lights[0]["light"]
+	if not is_equal_approx(lit_material.emission_energy_multiplier, float(emissive_materials[0]["energy"]) * day_glow) or not is_equal_approx(halo_material.albedo_color.a, (halo_materials[0]["color"] as Color).a * day_glow) or not is_equal_approx(local_light.light_energy, float(local_lights[0]["energy"]) * day_glow):
+		printerr("FAIL: daytime emission, halos, or point lights stayed bright")
+		quit(1)
+		return true
 	var high_sun: Vector3 = sky.get_shader_parameter("sun_direction")
 	var atmosphere_rules: TightropeRules = game.get("rules")
 	game.set("visual_z", Rules.step_z(1, Rules.STEPS_PER_TOWER - 1))
@@ -75,7 +91,7 @@ func _process(_delta: float) -> bool:
 		return true
 	game.call("_update_atmosphere", 2.0)
 	var low_moon: Vector3 = sky.get_shader_parameter("moon_direction")
-	if sky.get_shader_parameter("sky_mid_color") != Color("755fba"):
+	if sky.get_shader_parameter("sky_mid_color") != Color("51427f"):
 		printerr("FAIL: the third crossing did not become dusk")
 		quit(1)
 		return true
@@ -96,6 +112,10 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	game.call("_update_atmosphere", 2.0)
+	if not is_equal_approx(game.get("_lit_source_glow_factor"), 1.0) or not is_equal_approx(world_environment.glow_intensity, 0.85) or not is_equal_approx(lit_material.emission_energy_multiplier, float(emissive_materials[0]["energy"])) or not is_equal_approx(halo_material.albedo_color.a, (halo_materials[0]["color"] as Color).a) or not is_equal_approx(local_light.light_energy, float(local_lights[0]["energy"])):
+		printerr("FAIL: source glows did not return to full strength at night")
+		quit(1)
+		return true
 	game.set("visual_z", Rules.step_z(4, Rules.STEPS_PER_TOWER))
 	game.call("_update_atmosphere", 0.0)
 	var high_moon: Vector3 = sky.get_shader_parameter("moon_direction")

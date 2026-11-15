@@ -41,16 +41,21 @@ const TAILLIGHT_GLOW_ENERGY := 4.8
 const BEACON_BUILDING_INDICES := [3, 8, 14, 19]
 const RED_BEACON_PERIOD := 1.5
 const RED_BEACON_FLASH_DURATION := 0.24
-const SKY_TOP_COLORS := ["2377c9", "674790", "17265e", "08091b"]
-const SKY_MID_COLORS := ["65b5ee", "e87ca4", "755fba", "0d1030"]
-const SKY_HORIZON_COLORS := ["c9ecff", "ffad62", "c29cd8", "12122c"]
+const SKY_TOP_COLORS := ["2377c9", "674790", "111839", "08091b"]
+const SKY_MID_COLORS := ["65b5ee", "e87ca4", "51427f", "0d1030"]
+const SKY_HORIZON_COLORS := ["c9ecff", "ffad62", "9279ac", "12122c"]
 const SUN_ELEVATIONS := [20.0, 7.0, -12.0, -12.0, -12.0]
 const MOON_ELEVATIONS := [-3.0, -3.0, -3.0, 12.0, 22.0]
-const AMBIENT_COLORS := ["b8d9ff", "ffc1a8", "aa9bdb", "5c5c9c"]
+const AMBIENT_COLORS := ["b8d9ff", "ffc1a8", "8076b2", "5c5c9c"]
 const KEY_LIGHT_COLORS := ["fff0d1", "ffb577", "a8a6d9", "b5bbff"]
-const KEY_LIGHT_ENERGIES := [1.1, 0.72, 0.34, 0.2]
-const AMBIENT_ENERGIES := [0.65, 0.43, 0.24, 0.10]
-const DARKNESS_ALPHAS := [0.0, 0.04, 0.12, 0.22]
+const KEY_LIGHT_ENERGIES := [1.1, 0.72, 0.24, 0.2]
+const AMBIENT_ENERGIES := [0.65, 0.43, 0.17, 0.10]
+const DARKNESS_ALPHAS := [0.0, 0.04, 0.17, 0.22]
+const FOG_DENSITIES := [0.28, 0.65, 0.88, 1.0]
+const FOG_DEPTH_BEGINS := [120.0, 80.0, 60.0, 45.0]
+const FOG_DEPTH_ENDS := [400.0, 340.0, 300.0, 260.0]
+const FOG_HEIGHT_DENSITIES := [0.012, 0.025, 0.034, 0.04]
+const LIT_SOURCE_GLOW_FACTORS := [0.04, 0.35, 0.72, 1.0]
 const STAGE_SKY_BLEND_SPEED := 0.8
 const ROOF_SPIKE_COLOR := Color("7c829e")
 const SNOW_LAYER_THICKNESS := 0.22
@@ -89,6 +94,10 @@ var gust_snow: CPUParticles3D
 var traffic_lights: Array[Node3D] = []
 var _static_light_halos: Array[Dictionary] = []
 var _red_beacons: Array[Dictionary] = []
+var _emissive_materials: Array[Dictionary] = []
+var _halo_materials: Array[Dictionary] = []
+var _local_lights: Array[Dictionary] = []
+var _lit_source_glow_factor := 1.0
 var _red_beacon_elapsed := 0.0
 var _sky_stage := 0.0
 var _last_atmosphere_stage := -1.0
@@ -510,7 +519,7 @@ func _update_ropes() -> void:
 			var heat: float = rules.tension * rules.tension if index + 1 == rules.tower else 0.0
 			material.albedo_color = ROPE_COLOR.lerp(HOT_COLOR, heat)
 			material.emission = material.albedo_color
-			material.emission_energy_multiplier = lerpf(ROPE_BASE_EMISSION, ROPE_HOT_EMISSION, heat)
+			material.emission_energy_multiplier = lerpf(ROPE_BASE_EMISSION, ROPE_HOT_EMISSION, heat) * _lit_source_glow_factor
 			previous = next
 
 
@@ -647,6 +656,25 @@ func _update_atmosphere(dt: float) -> void:
 	_world_environment.ambient_light_color = _stage_color(AMBIENT_COLORS, _sky_stage)
 	_world_environment.ambient_light_energy = _stage_value(AMBIENT_ENERGIES, _sky_stage)
 	_world_environment.fog_light_color = horizon
+	_world_environment.fog_density = _stage_value(FOG_DENSITIES, _sky_stage)
+	_world_environment.fog_depth_begin = _stage_value(FOG_DEPTH_BEGINS, _sky_stage)
+	_world_environment.fog_depth_end = _stage_value(FOG_DEPTH_ENDS, _sky_stage)
+	_world_environment.fog_height_density = _stage_value(FOG_HEIGHT_DENSITIES, _sky_stage)
+	var glow_factor := _stage_value(LIT_SOURCE_GLOW_FACTORS, _sky_stage)
+	if not is_equal_approx(glow_factor, _lit_source_glow_factor):
+		_lit_source_glow_factor = glow_factor
+		_world_environment.glow_intensity = 0.85 * glow_factor
+		_halo_material.albedo_color = Color(1.0, 1.0, 1.0, glow_factor)
+		for entry in _emissive_materials:
+			var material: StandardMaterial3D = entry["material"]
+			material.emission_energy_multiplier = float(entry["energy"]) * glow_factor
+		for entry in _halo_materials:
+			var material: StandardMaterial3D = entry["material"]
+			var color: Color = entry["color"]
+			material.albedo_color = Color(color.r, color.g, color.b, color.a * glow_factor)
+		for entry in _local_lights:
+			var light: OmniLight3D = entry["light"]
+			light.light_energy = float(entry["energy"]) * glow_factor
 	_key_light.light_color = _stage_color(KEY_LIGHT_COLORS, _sky_stage)
 	_key_light.light_energy = _stage_value(KEY_LIGHT_ENERGIES, _sky_stage)
 	_key_light.look_at(_key_light.global_position - sun_direction.lerp(moon_direction, smoothstep(1.5, 2.2, _sky_stage)).normalized(), Vector3.UP)
@@ -1118,6 +1146,7 @@ func _build_street_lights() -> void:
 				glow.light_energy = 0.85
 				glow.omni_range = 13.0
 				lamp.add_child(glow)
+				_local_lights.append({"light": glow, "energy": 0.85})
 
 
 func _build_traffic() -> void:
@@ -1265,6 +1294,7 @@ func _add_light_halo(parent: Node3D, at: Vector3, size: Vector2, color: Color) -
 	var tinted_material := _halo_material.duplicate() as StandardMaterial3D
 	tinted_material.albedo_color = color
 	node.material_override = tinted_material
+	_halo_materials.append({"material": tinted_material, "color": color})
 	node.position = at
 	node.scale = Vector3(size.x, size.y, 1.0)
 	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -1307,6 +1337,7 @@ func _add_local_light(parent: Node3D, light_name: String, at: Vector3, color: Co
 	light.omni_range = radius
 	light.omni_attenuation = 2.0
 	parent.add_child(light)
+	_local_lights.append({"light": light, "energy": energy})
 	return light
 
 
@@ -1319,6 +1350,7 @@ func _material(color: Color, unshaded: bool = false, emission_energy: float = 0.
 		material.emission_enabled = true
 		material.emission = color
 		material.emission_energy_multiplier = emission_energy
+		_emissive_materials.append({"material": material, "energy": emission_energy})
 	return material
 
 
