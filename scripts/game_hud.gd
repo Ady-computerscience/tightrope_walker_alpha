@@ -24,6 +24,7 @@ var _countdown_fill: Panel
 var _countdown_fill_style: StyleBoxFlat
 var _caption: Label
 var _toast: Label
+var _toast_generation := 0
 var _win: PanelContainer
 var _win_text: Label
 var _paused: PanelContainer
@@ -82,12 +83,14 @@ func hide_countdown_bar() -> void:
 	_countdown_track.hide()
 
 
-func show_toast(message: String) -> void:
+func show_toast(message: String, duration: float = 3.0) -> void:
+	_toast_generation += 1
+	var generation := _toast_generation
 	_toast.text = message
 	_toast.visible = true
-	var timer := get_tree().create_timer(3.0)
+	var timer := get_tree().create_timer(duration)
 	timer.timeout.connect(func() -> void:
-		if is_instance_valid(_toast) and _toast.text == message:
+		if is_instance_valid(_toast) and _toast_generation == generation:
 			_toast.visible = false
 	)
 

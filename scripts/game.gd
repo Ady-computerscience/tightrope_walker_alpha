@@ -119,14 +119,12 @@ func _process(delta: float) -> void:
 				match event["type"]:
 					"birds": hud.show_toast("Birds incoming!")
 					"birds_arrived": hud.show_toast("Lean toward the middle bird")
-					"birds_pass": hud.show_toast("Birds passed")
-					"bird_gust": hud.show_toast("Bird gust! Keep your balance")
-					"gust_pass": hud.show_toast("Gust passed")
-					"gust_fail": hud.show_toast("Missed gust!")
+					"birds_pass": hud.show_toast("PASS", 1.0)
+					"gust_pass": hud.show_toast("PASS", 1.0)
 					"fall":
 						fall_elapsed = 0.0
 						step_duration = 0.0
-						hud.show_toast("You fell: %s" % event["reason"])
+						hud.show_toast("MISS", 1.0)
 						if walker_animation != null and walker_animation.has_animation("die"):
 							walker_animation.play("die")
 		if rules.state == "falling":
