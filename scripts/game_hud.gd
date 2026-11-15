@@ -11,7 +11,8 @@ const GOLD := Color("ffca62")
 const CORAL := Color("ff6a58")
 const WARNING_RED := Color("ff3b3b")
 const MINT := Color("7ee8ac")
-const PANEL := Color("2c182e")
+const PANEL := Color("211e36e8")
+const MUTED := Color("b7b5c9")
 const CONTROL_HINT_SECONDS := 10.0
 const COUNTDOWN_BAR_HEIGHT := 4.0
 const TOP_BANNER_SIDE_MARGIN := 24.0
@@ -28,12 +29,15 @@ var _countdown_fill_style: StyleBoxFlat
 var _caption: Label
 var _toast: Label
 var _toast_generation := 0
+var _toast_tween: Tween
 var _win: PanelContainer
 var _win_text: Label
 var _paused: PanelContainer
+var _scrim: ColorRect
 var _control_hint: PanelContainer
 var _control_hint_elapsed := 0.0
 var _hint_countdown_started := false
+var _tower_marks: Array[Panel] = []
 
 
 func _ready() -> void:
@@ -59,10 +63,15 @@ func start_control_hint_countdown() -> void:
 
 
 func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, cue: String) -> void:
-	_progress.text = "TOWER %d / 4     STEP %d / %d" % [tower, step, steps]
+	_progress.text = "TOWER %02d / 04     STEP %02d / %02d" % [tower, step, steps]
 	_stage.text = kind.to_upper()
 	_cue.text = cue
 	_balance.value = clampf((tilt + 1.0) * 50.0, 0.0, 100.0)
+	var fill := _balance.get_theme_stylebox("fill") as StyleBoxFlat
+	fill.bg_color = CORAL if absf(tilt) >= 0.7 else GOLD
+	for index in _tower_marks.size():
+		var style := _tower_marks[index].get_theme_stylebox("panel") as StyleBoxFlat
+		style.bg_color = GOLD if index < tower else Color("5b586f")
 
 
 func show_countdown_bar(screen_position: Vector2, width: float, remaining_fraction: float) -> void:
@@ -90,12 +99,19 @@ func hide_countdown_bar() -> void:
 func show_toast(message: String, duration: float = 3.0) -> void:
 	_toast_generation += 1
 	var generation := _toast_generation
+	if _toast_tween != null and _toast_tween.is_running():
+		_toast_tween.kill()
 	_toast.text = message
 	_toast.visible = true
+	_toast.modulate.a = 0.0
+	_toast_tween = create_tween()
+	_toast_tween.tween_property(_toast, "modulate:a", 1.0, 0.18)
 	var timer := get_tree().create_timer(duration)
 	timer.timeout.connect(func() -> void:
 		if is_instance_valid(_toast) and _toast_generation == generation:
-			_toast.visible = false
+			_toast_tween = create_tween()
+			_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.22)
+			_toast_tween.tween_callback(func() -> void: _toast.visible = false)
 	)
 
 
@@ -107,14 +123,17 @@ func show_caption(message: String) -> void:
 func show_win(seconds: float, falls: int, best_time: float) -> void:
 	_win_text.text = "YOU CROSSED THE SKY\n\nTime: %.1f s    Falls: %d\nBest: %.1f s" % [seconds, falls, best_time]
 	_win.visible = true
+	_scrim.visible = true
 
 
 func hide_win() -> void:
 	_win.visible = false
+	_scrim.visible = _paused.visible
 
 
 func set_paused(value: bool) -> void:
 	_paused.visible = value
+	_scrim.visible = value or _win.visible
 
 
 func _build() -> void:
@@ -125,31 +144,48 @@ func _build() -> void:
 
 	var top := PanelContainer.new()
 	top.name = "Top Banner"
-	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	top.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	top.offset_left = TOP_BANNER_SIDE_MARGIN
-	top.offset_right = -TOP_BANNER_SIDE_MARGIN
+	top.offset_right = 390.0
 	top.offset_top = TOP_BANNER_TOP_MARGIN
 	top.offset_bottom = TOP_BANNER_TOP_MARGIN + TOP_BANNER_HEIGHT
-	top.add_theme_stylebox_override("panel", _panel_style())
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_theme_stylebox_override("panel", _panel_style(16))
 	root.add_child(top)
 	var top_box := VBoxContainer.new()
-	top_box.add_theme_constant_override("separation", 4)
+	top_box.add_theme_constant_override("separation", 3)
 	top.add_child(top_box)
-	_progress = _label("TOWER 1 / 4", 21, GOLD)
-	_progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	top_box.add_child(_progress)
-	_stage = _label("WIND", 17, MINT)
-	_stage.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 4)
+	top_box.add_child(header)
+	_progress = _label("TOWER 01 / 04     STEP 00 / 09", 11, MUTED)
+	_progress.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(_progress)
+	for index in 4:
+		var mark := Panel.new()
+		mark.custom_minimum_size = Vector2(12, 3)
+		mark.add_theme_stylebox_override("panel", _flat(Color("5b586f"), 2))
+		header.add_child(mark)
+		_tower_marks.append(mark)
+	_stage = _label("WIND", 25, CREAM)
 	top_box.add_child(_stage)
+	var balance_row := HBoxContainer.new()
+	balance_row.add_theme_constant_override("separation", 8)
+	top_box.add_child(balance_row)
+	balance_row.add_child(_label("L", 10, MUTED))
 	_balance = ProgressBar.new()
 	_balance.min_value = 0.0
 	_balance.max_value = 100.0
 	_balance.value = 50.0
 	_balance.show_percentage = false
-	_balance.custom_minimum_size = Vector2(0, 12)
-	top_box.add_child(_balance)
-	_cue = _label("Keep the pole level", 14, CREAM)
-	_cue.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_balance.custom_minimum_size = Vector2(0, 9)
+	_balance.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_balance.add_theme_stylebox_override("background", _flat(Color("514b68"), 4))
+	_balance.add_theme_stylebox_override("fill", _flat(GOLD, 4))
+	balance_row.add_child(_balance)
+	balance_row.add_child(_label("R", 10, MUTED))
+	_cue = _label("Keep the pole level", 13, MINT)
+	_cue.clip_text = true
 	top_box.add_child(_cue)
 
 	_countdown_track = Panel.new()
@@ -176,47 +212,68 @@ func _build() -> void:
 
 	_control_hint = PanelContainer.new()
 	_control_hint.name = "Control Hint"
-	_control_hint.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_control_hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_control_hint.offset_left = -300.0
+	_control_hint.offset_right = 300.0
 	_control_hint.offset_top = -70.0
 	_control_hint.offset_bottom = -12.0
 	_control_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_control_hint.add_theme_stylebox_override("panel", _panel_style())
+	_control_hint.add_theme_stylebox_override("panel", _panel_style(12))
 	root.add_child(_control_hint)
-	var hint_text := _label("W / O: left / right foot   •   Q / P: lean left / right   •   Space: release", 20, CREAM)
-	hint_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var hint_text := RichTextLabel.new()
+	hint_text.bbcode_enabled = true
+	hint_text.text = "[center][b]Step left/right:[/b] W / O      [b]Lean left/right:[/b] Q / P[/center]"
+	hint_text.fit_content = true
+	hint_text.scroll_active = false
+	hint_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hint_text.add_theme_font_size_override("normal_font_size", 15)
+	hint_text.add_theme_color_override("default_color", CREAM)
 	_control_hint.add_child(hint_text)
 	_control_hint.hide()
 
 	_caption = _label("", 22, CREAM)
-	_caption.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_caption.offset_top = TOP_BANNER_TOP_MARGIN + TOP_BANNER_HEIGHT + 20.0
-	_caption.offset_left = -320.0
-	_caption.offset_right = 320.0
+	_caption.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_caption.offset_left = 90.0
+	_caption.offset_right = -90.0
+	_caption.offset_top = -145.0
+	_caption.offset_bottom = -84.0
 	_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_caption.visible = false
 	root.add_child(_caption)
 
-	_toast = _label("", 22, GOLD)
+	_toast = _label("", 18, GOLD)
 	_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_toast.offset_top = TOP_BANNER_TOP_MARGIN + TOP_BANNER_HEIGHT + 80.0
-	_toast.offset_left = -280.0
-	_toast.offset_right = 280.0
+	_toast.offset_top = TOP_BANNER_TOP_MARGIN + TOP_BANNER_HEIGHT + 20.0
+	_toast.offset_left = -300.0
+	_toast.offset_right = 300.0
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_toast.visible = false
 	root.add_child(_toast)
 
+	_scrim = ColorRect.new()
+	_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_scrim.color = Color("0b0b19ad")
+	_scrim.visible = false
+	root.add_child(_scrim)
+
 	_win = PanelContainer.new()
 	_win.set_anchors_preset(Control.PRESET_CENTER)
-	_win.offset_left = -200.0
-	_win.offset_right = 200.0
-	_win.offset_top = -130.0
-	_win.offset_bottom = 130.0
-	_win.add_theme_stylebox_override("panel", _panel_style())
+	_win.offset_left = -220.0
+	_win.offset_right = 220.0
+	_win.offset_top = -155.0
+	_win.offset_bottom = 155.0
+	_win.add_theme_stylebox_override("panel", _panel_style(24))
 	_win.visible = false
 	root.add_child(_win)
 	var win_box := VBoxContainer.new()
+	win_box.add_theme_constant_override("separation", 12)
 	_win.add_child(win_box)
+	var eyebrow := _label("FOUR TOWERS  /  ONE NIGHT", 12, MINT)
+	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	win_box.add_child(eyebrow)
 	_win_text = _label("", 23, GOLD)
 	_win_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	win_box.add_child(_win_text)
@@ -229,16 +286,19 @@ func _build() -> void:
 
 	_paused = PanelContainer.new()
 	_paused.set_anchors_preset(Control.PRESET_CENTER)
-	_paused.offset_left = -160.0
-	_paused.offset_right = 160.0
-	_paused.offset_top = -80.0
-	_paused.offset_bottom = 80.0
-	_paused.add_theme_stylebox_override("panel", _panel_style())
+	_paused.offset_left = -180.0
+	_paused.offset_right = 180.0
+	_paused.offset_top = -110.0
+	_paused.offset_bottom = 110.0
+	_paused.add_theme_stylebox_override("panel", _panel_style(22))
 	_paused.visible = false
 	root.add_child(_paused)
 	var pause_box := VBoxContainer.new()
+	pause_box.add_theme_constant_override("separation", 12)
 	_paused.add_child(pause_box)
-	pause_box.add_child(_label("PAUSED", 28, GOLD))
+	var pause_title := _label("PAUSED", 28, GOLD)
+	pause_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_box.add_child(pause_title)
 	var resume := _button("RESUME")
 	pause_box.add_child(resume)
 	resume.pressed.connect(func() -> void: pause_requested.emit())
@@ -252,22 +312,38 @@ func _label(message: String, font_size: int, color: Color) -> Label:
 	node.text = message
 	node.add_theme_font_size_override("font_size", font_size)
 	node.add_theme_color_override("font_color", color)
+	node.add_theme_color_override("font_outline_color", Color("111124"))
+	node.add_theme_constant_override("outline_size", 2)
 	return node
 
 
 func _button(message: String) -> Button:
 	var node := Button.new()
 	node.text = message
-	node.custom_minimum_size = Vector2(100, 50)
-	node.add_theme_font_size_override("font_size", 18)
+	node.custom_minimum_size = Vector2(100, 48)
+	node.add_theme_font_size_override("font_size", 16)
+	node.add_theme_color_override("font_color", CREAM)
+	node.add_theme_color_override("font_hover_color", PANEL)
+	node.add_theme_color_override("font_pressed_color", PANEL)
+	node.add_theme_stylebox_override("normal", _flat(Color("37314e"), 8))
+	node.add_theme_stylebox_override("hover", _flat(GOLD, 8))
+	node.add_theme_stylebox_override("pressed", _flat(CORAL, 8))
+	node.add_theme_stylebox_override("focus", _flat(MINT, 8))
 	return node
 
 
-func _panel_style() -> StyleBoxFlat:
+func _flat(color: Color, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = PANEL
-	style.border_color = GOLD
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(12)
-	style.set_content_margin_all(12)
+	style.bg_color = color
+	style.set_corner_radius_all(radius)
+	return style
+
+
+func _panel_style(padding: int) -> StyleBoxFlat:
+	var style := _flat(PANEL, 14)
+	style.border_color = Color("81769988")
+	style.set_border_width_all(1)
+	style.set_content_margin_all(padding)
+	style.shadow_color = Color("08081777")
+	style.shadow_size = 8
 	return style

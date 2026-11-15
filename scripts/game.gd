@@ -5,6 +5,7 @@ const Rules := preload("res://scripts/tightrope_rules.gd")
 const HudScene := preload("res://scripts/game_hud.gd")
 const BirdScene := preload("res://assets/actg/swamphen/australasian_swamphen.glb")
 const FlagScene := preload("res://assets/quaternius/flag/flag.glb")
+const VignetteShader := preload("res://shaders/vignette.gdshader")
 const BIRD_FLY_ANIMATION := "australasian_swamphen_fly"
 const INTRO_DURATION := 9.2
 const INTRO_SKIP_DURATION := 0.65
@@ -25,6 +26,8 @@ const GUST_TIMER_GAP_PIXELS := 8.0
 const GUST_TIMER_WIDTH := 100.0
 const SNOW_GUST_GRAVITY := 28.0
 const SNOW_BURST_DURATION := 0.8
+const TRAFFIC_START_Z := -440.0
+const TRAFFIC_END_Z := 50.0
 const STORIES := [
 	"The skyline waits ahead. Find your balance and take the first step.",
 	"Even the birds doubt you. Let them watch you prove them wrong.",
@@ -45,6 +48,7 @@ var birds: Array[Node3D] = []
 var gust_flag: Node3D
 var snow: CPUParticles3D
 var gust_snow: CPUParticles3D
+var traffic_lights: Array[Node3D] = []
 var _snow_gust_active := false
 var _bird_snow_remaining := 0.0
 var _bird_snow_direction := 0
@@ -68,6 +72,8 @@ var paused := false
 var best_time := INF
 var camera_position := Vector3.ZERO
 var camera_look := Vector3.ZERO
+var camera_wind_sway := 0.0
+var camera_bird_gust_remaining := 0.0
 var _rng := RandomNumberGenerator.new()
 
 
@@ -143,6 +149,7 @@ func _process(delta: float) -> void:
 				_play_walker_animation("idle")
 				_announce_tower("Try again")
 	_update_step(dt)
+	_update_traffic(dt)
 	_update_walker(dt)
 	_update_birds()
 	_update_ropes()
@@ -207,6 +214,8 @@ func _restart() -> void:
 	_play_walker_animation("idle")
 	step_duration = 0.0
 	fall_elapsed = 0.0
+	camera_wind_sway = 0.0
+	camera_bird_gust_remaining = 0.0
 	hud.set_paused(false)
 	hud.hide_win()
 	hud.hide_countdown_bar()
@@ -355,6 +364,7 @@ func _queue_bird_snow_burst(direction: int) -> void:
 	_bird_snow_direction = signi(direction)
 	_bird_snow_remaining = SNOW_BURST_DURATION
 	_bird_snow_burst_pending = true
+	camera_bird_gust_remaining = Rules.BIRD_GUST_DURATION
 
 
 func _update_snowfall(dt: float = 0.0) -> void:
@@ -399,6 +409,7 @@ func _update_ropes() -> void:
 			cylinder.height = direction.length() + 0.06
 			var material: StandardMaterial3D = segment.material_override
 			material.albedo_color = ROPE_COLOR.lerp(HOT_COLOR, rules.tension * rules.tension if index + 1 == rules.tower else 0.0)
+			material.emission = material.albedo_color
 			previous = next
 
 
@@ -417,7 +428,7 @@ func _rope_point(tower_number: int, s: float, current: Dictionary) -> Vector3:
 
 func _update_camera(dt: float) -> void:
 	var focus := walker.position
-	var desired_position := focus + Vector3(7.0, 6.5, 15.0)
+	var desired_position := focus + Vector3(7.0, 5.5, 15.0)
 	var desired_look := focus + Vector3(0.0, 1.0, -12.0)
 	if mode == "intro":
 		var progress := clampf(intro_elapsed / INTRO_DURATION, 0.0, 1.0)
@@ -440,8 +451,29 @@ func _update_camera(dt: float) -> void:
 	var amount := 1.0 - exp(-dt * 3.5)
 	camera_position = camera_position.lerp(desired_position, amount)
 	camera_look = camera_look.lerp(desired_look, amount)
-	camera.position = camera_position
+	var gust_direction := 0.0
+	var gust_strength := 0.0
+	var gust_remaining := 0.0
+	if mode == "walking" and rules.on_rope:
+		if camera_bird_gust_remaining > 0.0:
+			gust_direction = float(_bird_snow_direction)
+			gust_strength = 1.0
+			gust_remaining = camera_bird_gust_remaining
+		elif rules.state == "walking" and rules.wind_phase == "blow":
+			gust_direction = float(rules.wind_dir)
+			gust_strength = rules.wind_ramp
+			gust_remaining = rules.wind_timer
+	var active_gust := gust_direction != 0.0 and gust_remaining > 0.0
+	if active_gust:
+		var wind_target := gust_direction * gust_strength * (0.7 + 0.3 * sin(rules.time * 5.0))
+		camera_wind_sway = lerpf(camera_wind_sway, wind_target, 1.0 - exp(-dt * 8.0))
+	else:
+		camera_wind_sway = 0.0
+	var displayed_sway := camera_wind_sway * minf(1.0, gust_remaining / 0.12) if active_gust else 0.0
+	camera_bird_gust_remaining = maxf(0.0, camera_bird_gust_remaining - dt)
+	camera.position = camera_position + Vector3(displayed_sway * 0.20, 0.0, 0.0)
 	camera.look_at(camera_look)
+	camera.rotate_object_local(Vector3.FORWARD, deg_to_rad(displayed_sway * 1.8))
 
 
 func _update_hud() -> void:
@@ -464,14 +496,48 @@ func _announce_tower(subtitle: String = "") -> void:
 
 func _build_world() -> void:
 	var environment := WorldEnvironment.new()
+	environment.name = "Night Environment"
 	var resource := Environment.new()
 	resource.background_mode = Environment.BG_COLOR
 	resource.background_color = Color("12122c")
 	resource.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	resource.ambient_light_color = Color("5c5c9c")
 	resource.ambient_light_energy = 0.65
+	resource.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	resource.tonemap_exposure = 1.1
+	resource.glow_enabled = true
+	resource.glow_intensity = 0.3
+	resource.glow_strength = 0.8
+	resource.glow_bloom = 0.05
+	resource.glow_hdr_threshold = 1.05
+	resource.ssao_enabled = true
+	resource.ssao_intensity = 0.65
+	resource.adjustment_enabled = true
+	resource.adjustment_brightness = 0.99
+	resource.adjustment_contrast = 1.04
+	resource.adjustment_saturation = 1.06
+	resource.fog_enabled = true
+	resource.fog_mode = Environment.FOG_MODE_DEPTH
+	resource.fog_light_color = Color("454a64")
+	resource.fog_density = 0.26
+	resource.fog_depth_begin = 85.0
+	resource.fog_depth_end = 340.0
+	resource.fog_height = -3.0
+	resource.fog_height_density = 0.04
+	resource.fog_sky_affect = 0.0
 	environment.environment = resource
 	add_child(environment)
+	var vignette_layer := CanvasLayer.new()
+	vignette_layer.name = "Vignette"
+	vignette_layer.layer = 0
+	var vignette := ColorRect.new()
+	vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var vignette_material := ShaderMaterial.new()
+	vignette_material.shader = VignetteShader
+	vignette.material = vignette_material
+	vignette_layer.add_child(vignette)
+	add_child(vignette_layer)
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-35.0, -20.0, 0.0)
 	light.light_color = Color("b5bbff")
@@ -494,6 +560,8 @@ func _build_world() -> void:
 	_build_rooftop_skyscrapers()
 	_build_cityscape()
 	_build_city_ground()
+	_build_street_lights()
+	_build_traffic()
 	for number in range(1, Rules.TOWER_COUNT + 1):
 		var pieces: Array = []
 		for segment_number in ROPE_SEGMENTS:
@@ -503,7 +571,7 @@ func _build_world() -> void:
 			mesh.bottom_radius = 0.16
 			mesh.height = 2.0
 			segment.mesh = mesh
-			segment.material_override = _material(ROPE_COLOR)
+			segment.material_override = _material(ROPE_COLOR, false, 1.5)
 			add_child(segment)
 			pieces.append(segment)
 		ropes.append(pieces)
@@ -568,7 +636,7 @@ func _build_world() -> void:
 		star_mesh.radius = 0.13
 		star_mesh.height = 0.26
 		star.mesh = star_mesh
-		star.material_override = _material(Color("fff4d8"), true)
+		star.material_override = _material(Color("fff4d8"), true, 1.8)
 		star.position = Vector3(_rng.randf_range(-180.0, 180.0), _rng.randf_range(68.0, 130.0), _rng.randf_range(-340.0, 60.0))
 		add_child(star)
 
@@ -668,8 +736,8 @@ func _build_rooftop_skyscrapers() -> void:
 				var offset := (float(column) - 1.0) * 5.0
 				var glass: Color = glass_colors[(number + floor_number + column) % glass_colors.size()]
 				for side in [-1.0, 1.0]:
-					_city_box(tower, Vector3(offset, y, side * 10.04), Vector3(2.8, 2.2, 0.12), glass, true)
-					_city_box(tower, Vector3(side * 8.54, y, offset * 1.25), Vector3(0.12, 2.2, 2.8), glass, true)
+					_city_box(tower, Vector3(offset, y, side * 10.04), Vector3(2.8, 2.2, 0.12), glass, true, 2.0)
+					_city_box(tower, Vector3(side * 8.54, y, offset * 1.25), Vector3(0.12, 2.2, 2.8), glass, true, 2.0)
 		if number == Rules.TOWER_COUNT + 1:
 			_city_box(tower, Vector3(6.5, roof_y + 3.0, 6.5), Vector3(0.3, 6.0, 0.3), Color("a5bfd5"))
 
@@ -700,7 +768,7 @@ func _build_cityscape() -> void:
 						continue
 					for column in 2:
 						var pane_z := z + (float(column) - 0.5) * depth * 0.38
-						_city_box(city, Vector3(inner_face, -12.0 + floor_number * 5.0, pane_z), Vector3(0.12, 1.55, 1.2), windows[skyline_rng.randi_range(0, windows.size() - 1)], true)
+						_city_box(city, Vector3(inner_face, -12.0 + floor_number * 5.0, pane_z), Vector3(0.12, 1.55, 1.2), windows[skyline_rng.randi_range(0, windows.size() - 1)], true, 2.0)
 				if skyline_rng.randf() < 0.3:
 					_city_box(city, Vector3(x, -12.0 + height + 2.5, z), Vector3(0.25, 5.0, 0.25), Color("7c829e"))
 
@@ -721,22 +789,71 @@ func _build_city_ground() -> void:
 			_city_box(ground, Vector3(side * 13.0, -11.97, z), Vector3(0.35, 0.06, 7.0), Color("d4b77b"), true)
 
 
-func _city_box(parent: Node3D, at: Vector3, size: Vector3, color: Color, unshaded: bool = false) -> MeshInstance3D:
+func _build_street_lights() -> void:
+	var lamps := Node3D.new()
+	lamps.name = "Street Lights"
+	add_child(lamps)
+	for index in 9:
+		var z := 30.0 - index * 48.0
+		for side in [-1.0, 1.0]:
+			var lamp := Node3D.new()
+			lamp.position = Vector3(side * 35.5, -11.8, z)
+			lamps.add_child(lamp)
+			_city_box(lamp, Vector3(0.0, 2.8, 0.0), Vector3(0.18, 5.6, 0.18), Color("4a4b5c"))
+			_city_box(lamp, Vector3(-side * 0.65, 5.55, 0.0), Vector3(1.3, 0.13, 0.13), Color("4a4b5c"))
+			_city_box(lamp, Vector3(-side * 1.3, 5.45, 0.0), Vector3(0.7, 0.18, 0.5), Color("ffce83"), true, 3.0)
+			if index % 2 == 0:
+				var glow := OmniLight3D.new()
+				glow.position = Vector3(-side * 1.3, 5.2, 0.0)
+				glow.light_color = Color("ffd39a")
+				glow.light_energy = 0.85
+				glow.omni_range = 13.0
+				lamp.add_child(glow)
+
+
+func _build_traffic() -> void:
+	var traffic := Node3D.new()
+	traffic.name = "Street Traffic"
+	add_child(traffic)
+	for index in 10:
+		var direction := 1.0 if index % 2 == 0 else -1.0
+		var car := Node3D.new()
+		car.position = Vector3(-17.0 if direction > 0.0 else 17.0, -11.65, -395.0 + float(index / 2) * 85.0 + float(index % 2) * 18.0)
+		traffic.add_child(car)
+		_city_box(car, Vector3(0.0, 0.22, 0.0), Vector3(2.2, 0.55, 3.5), Color("252a36"))
+		for side in [-1.0, 1.0]:
+			_city_box(car, Vector3(side * 0.75, 0.48, direction * 1.8), Vector3(0.38, 0.22, 0.16), Color("fff0c3"), true, 3.0)
+			_city_box(car, Vector3(side * 0.75, 0.48, -direction * 1.8), Vector3(0.38, 0.22, 0.16), Color("ff625b"), true, 2.5)
+		traffic_lights.append(car)
+
+
+func _update_traffic(dt: float) -> void:
+	for index in traffic_lights.size():
+		var car := traffic_lights[index]
+		var direction := 1.0 if index % 2 == 0 else -1.0
+		car.position.z = wrapf(car.position.z + direction * (14.0 + float(index % 3) * 2.0) * dt, TRAFFIC_START_Z, TRAFFIC_END_Z)
+
+
+func _city_box(parent: Node3D, at: Vector3, size: Vector3, color: Color, unshaded: bool = false, emission_energy: float = 0.0) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = size
 	node.mesh = mesh
-	node.material_override = _material(color, unshaded)
+	node.material_override = _material(color, unshaded, emission_energy)
 	node.position = at
 	parent.add_child(node)
 	return node
 
 
-func _material(color: Color, unshaded: bool = false) -> StandardMaterial3D:
+func _material(color: Color, unshaded: bool = false, emission_energy: float = 0.0) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
 	if unshaded:
 		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	if emission_energy > 0.0:
+		material.emission_enabled = true
+		material.emission = color
+		material.emission_energy_multiplier = emission_energy
 	return material
 
 

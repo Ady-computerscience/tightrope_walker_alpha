@@ -160,7 +160,7 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	var intro_camera_position := camera.position
-	var start_view_position: Vector3 = game.get("walker").position + Vector3(7.0, 6.5, 15.0)
+	var start_view_position: Vector3 = game.get("walker").position + Vector3(7.0, 5.5, 15.0)
 	game.call("_start_intro_skip")
 	if game.get("mode") != "intro_skip" or not camera.position.is_equal_approx(intro_camera_position):
 		printerr("FAIL: intro skip did not start from the current camera view")
@@ -195,9 +195,10 @@ func _process(_delta: float) -> bool:
 	game.call("_update_gust_visual")
 	game.call("_update_reaction_timer")
 	game.call("_update_snowfall")
+	game.call("_update_camera", 0.1)
 	var snowfall: CPUParticles3D = game.get("snow")
 	var gust_snow: CPUParticles3D = game.get("gust_snow")
-	if not gust_flag.visible or gust_flag.position.x >= 0.0 or timer_track.visible or snowfall.local_coords or not is_zero_approx(snowfall.gravity.x) or gust_snow.visible:
+	if not gust_flag.visible or gust_flag.position.x >= 0.0 or timer_track.visible or snowfall.local_coords or not is_zero_approx(snowfall.gravity.x) or gust_snow.visible or not is_zero_approx(game.get("camera_wind_sway")):
 		printerr("FAIL: gust flag did not appear on the left during the cue")
 		quit(1)
 		return true
@@ -221,7 +222,8 @@ func _process(_delta: float) -> bool:
 	game.call("_update_gust_visual")
 	game.call("_update_reaction_timer")
 	game.call("_update_snowfall")
-	if not is_zero_approx(snowfall.gravity.x) or not is_zero_approx(snowfall.direction.x) or gust_snow.visible:
+	game.call("_update_camera", 0.1)
+	if not is_zero_approx(snowfall.gravity.x) or not is_zero_approx(snowfall.direction.x) or gust_snow.visible or not is_zero_approx(game.get("camera_wind_sway")):
 		printerr("FAIL: snowfall burst started before the reaction countdown ended")
 		quit(1)
 		return true
@@ -260,13 +262,19 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: snowfall burst did not begin when the countdown ended")
 		quit(1)
 		return true
+	game.call("_update_camera", 0.1)
+	if game.get("camera_wind_sway") <= 0.0 or camera.position.x <= game.get("camera_position").x:
+		printerr("FAIL: camera did not sway with the active wind gust")
+		quit(1)
+		return true
 	startup_rules.on_rope = false
 	startup_rules.wind_phase = "rest"
 	startup_rules.wind_timer = 2.5
 	startup_rules.wind_ramp = 0.0
 	game.call("_update_gust_visual")
 	game.call("_update_snowfall")
-	if not is_zero_approx(snowfall.gravity.x) or not is_zero_approx(snowfall.direction.x):
+	game.call("_update_camera", 0.1)
+	if not is_zero_approx(snowfall.gravity.x) or not is_zero_approx(snowfall.direction.x) or not is_zero_approx(game.get("camera_wind_sway")):
 		printerr("FAIL: snowfall did not return to calm after the gust")
 		quit(1)
 		return true
@@ -318,14 +326,15 @@ func _process(_delta: float) -> bool:
 	bird_snow_rules.bird_timer = 0.5
 	bird_snow_rules.bird_dir = 1
 	game.call("_update_snowfall")
-	if gust_snow.visible or not is_zero_approx(snowfall.gravity.x):
+	game.call("_update_camera", 0.1)
+	if gust_snow.visible or not is_zero_approx(snowfall.gravity.x) or not is_zero_approx(game.get("camera_wind_sway")):
 		printerr("FAIL: bird snow burst appeared during the reaction countdown")
 		quit(1)
 		return true
 	Input.action_press("lean_right")
 	game.call("_process", 1.0 / 60.0)
 	Input.action_release("lean_right")
-	if bird_snow_rules.bird_phase != "rest" or not gust_snow.visible or gust_snow.direction.x >= 0.0 or snowfall.gravity.x >= 0.0:
+	if bird_snow_rules.bird_phase != "rest" or not gust_snow.visible or gust_snow.direction.x >= 0.0 or snowfall.gravity.x >= 0.0 or game.get("camera_wind_sway") >= 0.0:
 		printerr("FAIL: successful bird trial did not burst snow opposite the center bird")
 		quit(1)
 		return true
@@ -340,8 +349,14 @@ func _process(_delta: float) -> bool:
 	Input.action_press("lean_right")
 	game.call("_process", 1.0 / 60.0)
 	Input.action_release("lean_right")
-	if missed_bird_rules.state != "falling" or not gust_snow.visible or gust_snow.direction.x <= 0.0 or snowfall.gravity.x <= 0.0:
+	if missed_bird_rules.state != "falling" or not gust_snow.visible or gust_snow.direction.x <= 0.0 or snowfall.gravity.x <= 0.0 or game.get("camera_wind_sway") <= 0.0:
 		printerr("FAIL: failed bird trial did not burst snow before the fall")
+		quit(1)
+		return true
+	game.call("_update_camera", Rules.BIRD_GUST_DURATION)
+	game.call("_update_camera", 0.1)
+	if not is_zero_approx(game.get("camera_wind_sway")) or not is_zero_approx(game.get("camera_bird_gust_remaining")):
+		printerr("FAIL: bird camera sway continued after its gust ended")
 		quit(1)
 		return true
 	game.call("_update_snowfall", 1.0)
@@ -385,6 +400,19 @@ func _process(_delta: float) -> bool:
 	var city_ground := game.get_node_or_null("City Ground")
 	if city_ground == null or city_ground.get_node_or_null("Asphalt Street") == null or city_ground.get_child_count() < 50:
 		printerr("FAIL: city street and sidewalks were not built")
+		quit(1)
+		return true
+	var street_lights := game.get_node_or_null("Street Lights")
+	var traffic := game.get_node_or_null("Street Traffic")
+	var cars: Array = game.get("traffic_lights")
+	if street_lights == null or street_lights.get_child_count() < 10 or traffic == null or cars.size() != 10:
+		printerr("FAIL: street lights or traffic were not built")
+		quit(1)
+		return true
+	var first_car_z: float = cars[0].position.z
+	game.call("_update_traffic", 0.25)
+	if cars[0].position.z <= first_car_z:
+		printerr("FAIL: traffic lights did not move along the street")
 		quit(1)
 		return true
 	var decorations := game.get_node_or_null("Kenney Holiday Decorations")
