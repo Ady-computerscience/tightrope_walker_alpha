@@ -189,7 +189,8 @@ func _step(foot: String = "") -> void:
 	step_to = Rules.step_z(rules.tower, rules.step)
 	if result == "won":
 		step_to = Rules.step_z(Rules.TOWER_COUNT, Rules.STEPS_PER_TOWER)
-	step_duration = 0.6 if absf(step_to - step_from) > 8.0 else 0.4
+	var step_distance := absf(step_to - step_from)
+	step_duration = 1.2 if step_distance > 15.0 else (0.6 if step_distance > 8.0 else 0.4)
 	step_elapsed = 0.0
 	step_result = result
 	_play_walker_animation("walk")
@@ -311,7 +312,7 @@ func _update_walker(_dt: float) -> void:
 		var s: float = rope["progress"]
 		var sag := STATIC_SAG * 4.0 * s * (1.0 - s)
 		var load_sag := LOAD_SAG * 4.0 * s * (1.0 - s) * (1.0 - 0.55 * rules.tension)
-		feet.y -= sag + load_sag
+		feet.y -= (sag + load_sag) * _rope_sag_factor(rope, int(rope["tower"]))
 		feet.x = rules.tilt * 0.35
 		if rules.stage_kind() == "Sway":
 			feet.x += rules.sway * 1.6 * sin(PI * s)
@@ -423,9 +424,9 @@ func _update_ropes() -> void:
 		if not active:
 			continue
 		var segments: Array = ropes[index]
-		var previous := _rope_point(index + 1, 0.0, current)
-		for part in range(ROPE_SEGMENTS):
-			var s := float(part + 1) / ROPE_SEGMENTS
+		var previous := _roof_anchor_point(index + 1)
+		for part in range(ROPE_SEGMENTS + 1):
+			var s := float(part) / ROPE_SEGMENTS
 			var next := _rope_point(index + 1, s, current)
 			var segment: MeshInstance3D = segments[part]
 			var direction := next - previous
@@ -439,17 +440,30 @@ func _update_ropes() -> void:
 			previous = next
 
 
+func _roof_anchor_point(tower_number: int) -> Vector3:
+	return Vector3(0.0, ROPE_Y, Rules.tower_z(tower_number) - Rules.ROPE_ROOF_ANCHOR_OFFSET)
+
+
 func _rope_point(tower_number: int, s: float, current: Dictionary) -> Vector3:
-	var y := ROPE_Y - STATIC_SAG * 4.0 * s * (1.0 - s)
+	var z := Rules.tower_z(tower_number) - Rules.ROPE_START_OFFSET - s * Rules.ROPE_LENGTH
+	var sag_factor := _rope_sag_factor(current, tower_number)
+	var y := ROPE_Y - STATIC_SAG * 4.0 * s * (1.0 - s) * sag_factor
 	var x := 0.0
 	if tower_number == rules.tower and rules.stage_kind() == "Sway":
 		x += rules.sway * 1.6 * sin(PI * s)
 	if not current.is_empty() and tower_number == current["tower"]:
 		var load: float = current["progress"]
 		var triangle := s / load if s <= load and load > 0.0 else ((1.0 - s) / (1.0 - load) if s > load and load < 1.0 else 0.0)
-		y -= LOAD_SAG * 4.0 * load * (1.0 - load) * triangle * (1.0 - 0.55 * rules.tension)
+		y -= LOAD_SAG * 4.0 * load * (1.0 - load) * triangle * (1.0 - 0.55 * rules.tension) * sag_factor
 		x += rules.tilt * 0.35 * triangle
-	return Vector3(x, y, Rules.tower_z(tower_number) - Rules.ROPE_START_OFFSET - s * Rules.ROPE_LENGTH)
+	return Vector3(x, y, z)
+
+
+func _rope_sag_factor(current: Dictionary, tower_number: int) -> float:
+	if current.is_empty() or int(current["tower"]) != tower_number:
+		return 0.0
+	var progress: float = current["progress"]
+	return smoothstep(0.0, 0.08, progress) * smoothstep(0.0, 0.08, 1.0 - progress)
 
 
 func _update_camera(dt: float) -> void:
@@ -590,7 +604,13 @@ func _build_world() -> void:
 	_build_traffic()
 	for number in range(1, Rules.TOWER_COUNT + 1):
 		var pieces: Array = []
-		for segment_number in ROPE_SEGMENTS:
+		var roof_anchor := _roof_anchor_point(number)
+		var edge_anchor := _rope_point(number, 0.0, {})
+		var roof_mount := _city_box(self, roof_anchor - Vector3(0.0, 0.2, 0.0), Vector3(0.45, 0.4, 0.45), Color("a5bfd5"))
+		roof_mount.name = "Roof Rope Anchor %d" % number
+		var edge_mount := _city_box(self, edge_anchor - Vector3(0.0, 0.2, 0.0), Vector3(0.45, 0.4, 0.45), Color("a5bfd5"))
+		edge_mount.name = "Edge Rope Anchor %d" % number
+		for segment_number in range(ROPE_SEGMENTS + 1):
 			var segment := MeshInstance3D.new()
 			var mesh := CylinderMesh.new()
 			mesh.top_radius = 0.16

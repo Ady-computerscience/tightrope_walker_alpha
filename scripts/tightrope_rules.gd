@@ -5,9 +5,11 @@ extends RefCounted
 const TOWER_COUNT := 4
 const STEPS_PER_TOWER := 9
 const TOWER_SPACING := 62.0
-const ROOFTOP_START_OFFSET := 6.5
-const ROPE_START_OFFSET := 7.0
-const ROPE_LENGTH := 48.0
+const ROOFTOP_START_OFFSET := 15.0
+const ROOF_FRONT_EDGE_OFFSET := 16.0
+const ROPE_ROOF_ANCHOR_OFFSET := 10.0
+const ROPE_START_OFFSET := ROOF_FRONT_EDGE_OFFSET
+const ROPE_LENGTH := 39.0
 const STEP_COOLDOWN := 0.45
 const INSTABILITY := 1.2
 const LEAN_POWER := 2.4
@@ -98,7 +100,9 @@ static func step_z(tower_number: int, step_number: int) -> float:
 		return z - ROOFTOP_START_OFFSET
 	if step_number >= STEPS_PER_TOWER:
 		return tower_z(tower_number + 1) - ROOFTOP_START_OFFSET
-	return z - 8.0 - (step_number - 1) * (46.0 / (STEPS_PER_TOWER - 2))
+	var first_rope_step := ROOF_FRONT_EDGE_OFFSET + 1.0
+	var last_rope_step := ROPE_START_OFFSET + ROPE_LENGTH - 1.0
+	return z - first_rope_step - (step_number - 1) * ((last_rope_step - first_rope_step) / (STEPS_PER_TOWER - 2))
 
 
 static func rope_at(z: float) -> Dictionary:
@@ -106,7 +110,7 @@ static func rope_at(z: float) -> Dictionary:
 	if index < 1 or index > TOWER_COUNT:
 		return {}
 	var progress := (tower_z(index) - ROPE_START_OFFSET - z) / ROPE_LENGTH
-	if progress < 0.0 or progress > 1.0:
+	if progress < 0.0 or progress > 1.0 or z >= tower_z(index) - ROOF_FRONT_EDGE_OFFSET:
 		return {}
 	return {"tower": index, "progress": progress}
 

@@ -388,6 +388,41 @@ func _process(_delta: float) -> bool:
 		var facade_top := facade_body.position.y + facade_mesh.size.y * 0.5
 		var roof_top := roof.position.y + roof_mesh.size.y * 0.5
 		var roof_bottom := roof.position.y - roof_mesh.size.y * 0.5
+		var tower_number := tower.get_index() + 1
+		if tower_number <= Rules.TOWER_COUNT:
+			var front_edge := roof.global_position.z - roof_mesh.size.z * 0.5
+			var start_z := Rules.step_z(tower_number, 0)
+			var first_step_z := Rules.step_z(tower_number, 1)
+			if start_z <= front_edge or start_z > front_edge + 2.0 or first_step_z >= front_edge:
+				printerr("FAIL: tower %d does not start just inside the roof edge and step off it" % tower_number)
+				quit(1)
+				return true
+			var back_edge := roof.global_position.z + roof_mesh.size.z * 0.5
+			var roof_anchor: Vector3 = game.call("_roof_anchor_point", tower_number)
+			var edge_loaded_rope := Rules.rope_at(first_step_z)
+			var edge_anchor: Vector3 = game.call("_rope_point", tower_number, 0.0, edge_loaded_rope)
+			var roof_mount := game.get_node_or_null("Roof Rope Anchor %d" % tower_number) as MeshInstance3D
+			var edge_mount := game.get_node_or_null("Edge Rope Anchor %d" % tower_number) as MeshInstance3D
+			var rope_segments: Array = game.get("ropes")[tower_number - 1]
+			if not is_equal_approx(roof_anchor.z, lerpf(back_edge, front_edge, 0.75)) or not is_equal_approx(edge_anchor.z, front_edge) or not is_equal_approx(roof_anchor.y, edge_anchor.y) or roof_mount == null or edge_mount == null or not is_equal_approx(roof_mount.position.z, roof_anchor.z) or not is_equal_approx(edge_mount.position.z, edge_anchor.z) or rope_segments.size() != 27:
+				printerr("FAIL: roof and edge rope anchors are not connected on tower %d" % tower_number)
+				quit(1)
+				return true
+			var parked_rope := Rules.rope_at(start_z)
+			var walking_rope := Rules.rope_at(Rules.step_z(tower_number, 4))
+			var parked_midpoint: Vector3 = game.call("_rope_point", tower_number, 0.5, parked_rope)
+			var loaded_midpoint: Vector3 = game.call("_rope_point", tower_number, 0.5, walking_rope)
+			if not parked_rope.is_empty() or not is_equal_approx(parked_midpoint.y, roof_anchor.y) or loaded_midpoint.y >= parked_midpoint.y:
+				printerr("FAIL: rope load sag began before the walker passed the edge anchor on tower %d" % tower_number)
+				quit(1)
+				return true
+			var near_edge_z := front_edge - 1.0
+			var near_edge_progress := (Rules.tower_z(tower_number) - Rules.ROPE_START_OFFSET - near_edge_z) / Rules.ROPE_LENGTH
+			var near_edge_point: Vector3 = game.call("_rope_point", tower_number, near_edge_progress, edge_loaded_rope)
+			if near_edge_point.y - 0.16 <= roof.global_position.y + roof_mesh.size.y * 0.5:
+				printerr("FAIL: loaded rope clips the roof edge on tower %d" % tower_number)
+				quit(1)
+				return true
 		if facade_top >= roof_top - 0.1 or facade_top <= roof_bottom + 0.1:
 			printerr("FAIL: skyscraper facade top overlaps the visible roof top or leaves a gap")
 			quit(1)
@@ -479,7 +514,7 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: restarted control hint did not expire after its first step")
 		quit(1)
 		return true
-	game.call("_update_step", 1.0)
+	game.call("_update_step", 1.3)
 	if run.checkpoint_tower != 2 or run.on_rope:
 		printerr("FAIL: landing did not save tower two checkpoint")
 		quit(1)
