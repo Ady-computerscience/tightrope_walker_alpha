@@ -22,6 +22,7 @@ const TOP_BANNER_HEIGHT := 116.0
 
 var _progress: Label
 var _stage: Label
+var _run_timer: Label
 var _cue: Label
 var _balance: ProgressBar
 var _wire_gauge: WireTensionGauge
@@ -65,9 +66,11 @@ func start_control_hint_countdown() -> void:
 	_control_hint_elapsed = 0.0
 
 
-func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, cue: String, tension: float = 0.0) -> void:
+func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, cue: String, tension: float = 0.0, run_seconds: float = 0.0) -> void:
 	_progress.text = "TOWER %02d / 04     STEP %02d / %02d" % [tower, step, steps]
 	_stage.text = kind.to_upper()
+	var elapsed_tenths := roundi(maxf(0.0, run_seconds) * 10.0)
+	_run_timer.text = "TIME %02d:%02d.%d" % [floori(float(elapsed_tenths) / 600.0), floori(float(elapsed_tenths % 600) / 10.0), elapsed_tenths % 10]
 	_cue.text = cue
 	_wire_gauge_panel.visible = tower >= 3
 	_wire_gauge.set_tension(tension)
@@ -172,8 +175,15 @@ func _build() -> void:
 		mark.add_theme_stylebox_override("panel", _flat(Color("5b586f"), 2))
 		header.add_child(mark)
 		_tower_marks.append(mark)
+	var stage_row := HBoxContainer.new()
+	stage_row.add_theme_constant_override("separation", 8)
+	top_box.add_child(stage_row)
 	_stage = _label("WIND", 25, CREAM)
-	top_box.add_child(_stage)
+	_stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stage_row.add_child(_stage)
+	_run_timer = _label("TIME 00:00.0", 16, GOLD)
+	_run_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	stage_row.add_child(_run_timer)
 	var balance_row := HBoxContainer.new()
 	balance_row.add_theme_constant_override("separation", 8)
 	top_box.add_child(balance_row)
@@ -325,6 +335,7 @@ func _build() -> void:
 	var restart := _button("RESTART")
 	pause_box.add_child(restart)
 	restart.pressed.connect(func() -> void: replay_requested.emit())
+	root.move_child(top, root.get_child_count() - 1)
 
 
 func _label(message: String, font_size: int, color: Color) -> Label:

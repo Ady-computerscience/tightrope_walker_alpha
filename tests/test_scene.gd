@@ -263,6 +263,24 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	var hud: GameHUD = game.get("hud")
+	var run_timer: Label = hud.get("_run_timer")
+	var top_banner: PanelContainer = run_timer.get_parent().get_parent().get_parent() as PanelContainer if run_timer != null else null
+	var scrim: ColorRect = hud.get("_scrim")
+	if run_timer == null or run_timer.text != "TIME 00:00.0" or not run_timer.is_visible_in_tree() or top_banner == null or top_banner.get_index() <= scrim.get_index():
+		printerr("FAIL: run timer is not visible above pause and finish overlays from the start")
+		quit(1)
+		return true
+	hud.show_status(1, 0, Rules.STEPS_PER_TOWER, "Wind", 0.0, "Keep the pole level", 0.0, 65.4)
+	if run_timer.text != "TIME 01:05.4":
+		printerr("FAIL: run timer does not format elapsed minutes and seconds")
+		quit(1)
+		return true
+	hud.show_status(1, 0, Rules.STEPS_PER_TOWER, "Wind", 0.0, "Keep the pole level", 0.0, 59.96)
+	if run_timer.text != "TIME 01:00.0":
+		printerr("FAIL: run timer did not roll over cleanly at one minute")
+		quit(1)
+		return true
+	game.call("_update_hud")
 	var wire_gauge: WireTensionGauge = hud.get("_wire_gauge")
 	var wire_gauge_panel: PanelContainer = hud.get("_wire_gauge_panel")
 	if wire_gauge == null or wire_gauge_panel == null or wire_gauge_panel.visible:

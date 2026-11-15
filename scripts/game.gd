@@ -656,7 +656,7 @@ func _update_hud() -> void:
 					cue = "Bird gust!"
 				else:
 					cue = "Sway: %.0f%%  •  Space: release wire" % [rules.sway * 100.0]
-	hud.show_status(rules.tower, rules.step, Rules.STEPS_PER_TOWER, rules.stage_kind(), rules.tilt, cue, rules.tension)
+	hud.show_status(rules.tower, rules.step, Rules.STEPS_PER_TOWER, rules.stage_kind(), rules.tilt, cue, rules.tension, rules.time)
 
 
 func _announce_tower(subtitle: String = "") -> void:

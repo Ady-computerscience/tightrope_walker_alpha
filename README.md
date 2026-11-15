@@ -6,7 +6,7 @@ A Godot 4.7 single-player port of the supplied Roblox game. The balance and stag
 
 Open `project.godot` in Godot 4.7 and run the project. Press **W** to step with the left foot or **O** to step with the right foot; lean with **Q/P**. Release tension with **Space** or **E**, pause with **Escape**, and restart with **R**. During a fall, press **Space** to respawn immediately. The gamepad step button alternates feet automatically.
 
-The control hint appears at the bottom only when the game starts or is explicitly restarted. It stays visible until the first successful step, then hides ten seconds later.
+The run timer stays visible in the top HUD banner from the opening through falls, pause, and the finish screen. The control hint appears at the bottom only when the game starts or is explicitly restarted. It stays visible until the first successful step, then hides ten seconds later.
 
 The first rope section introduces Gust Warning. A flag appears on the side the gust will come from. Press **Q/P** to lean away from the flag during the one-second response window. Leaning toward the flag or missing the response triggers a strong gust that makes the walker fall. Gust Warning remains active on later sections alongside their other interruptions. A fall returns the walker to the last reached tower. The final step opens a win card; **Stargaze** plays the ending camera move.
 
