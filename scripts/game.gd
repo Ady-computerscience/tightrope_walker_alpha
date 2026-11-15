@@ -6,6 +6,7 @@ const HudScene := preload("res://scripts/game_hud.gd")
 const BirdScene := preload("res://assets/actg/swamphen/australasian_swamphen.glb")
 const FlagScene := preload("res://assets/quaternius/flag/flag.glb")
 const VignetteShader := preload("res://shaders/vignette.gdshader")
+const NightSkyShader := preload("res://shaders/night_sky.gdshader")
 const BIRD_FLY_ANIMATION := "australasian_swamphen_fly"
 const INTRO_DURATION := 9.2
 const INTRO_SKIP_DURATION := 0.65
@@ -19,8 +20,10 @@ const ROPE_Y := 44.87
 const STATIC_SAG := 0.25
 const LOAD_SAG := 0.9
 const ROPE_SEGMENTS := 26
-const ROPE_COLOR := Color("ecd6ac")
+const ROPE_COLOR := Color("b5a38b")
 const HOT_COLOR := Color("ff5c46")
+const ROPE_BASE_EMISSION := 0.4
+const ROPE_HOT_EMISSION := 1.0
 const POLE_WAIST_Y := 1.15
 const POLE_FRONT_Z := -0.42
 const BIRD_HOVER_HEIGHT := 3.5
@@ -29,10 +32,29 @@ const GUST_TIMER_GAP_PIXELS := 8.0
 const GUST_TIMER_WIDTH := 100.0
 const SNOW_GUST_GRAVITY := 28.0
 const SNOW_BURST_DURATION := 0.8
+const WINDOW_GLOW_ENERGY := 3.8
+const LIT_WINDOW_CHANCE := 0.62
+const DARK_WINDOW_COLOR := Color("4b5c86ff")
+const STREETLAMP_GLOW_ENERGY := 5.5
+const HEADLIGHT_GLOW_ENERGY := 6.0
+const TAILLIGHT_GLOW_ENERGY := 4.8
+const BEACON_BUILDING_INDICES := [3, 8, 14, 19]
+const RED_BEACON_PERIOD := 1.5
+const RED_BEACON_FLASH_DURATION := 0.24
+const ROOF_SPIKE_COLOR := Color("7c829e")
 const SNOW_LAYER_THICKNESS := 0.22
 const GROUND_SNOW_THICKNESS := 0.08
-const TRAFFIC_START_Z := -440.0
+const CITY_GROUND_FAR_Z := -680.0
+const CITY_GROUND_NEAR_Z := 60.0
+const CITY_GROUND_LENGTH := CITY_GROUND_NEAR_Z - CITY_GROUND_FAR_Z
+const CITY_GROUND_CENTER_Z := (CITY_GROUND_NEAR_Z + CITY_GROUND_FAR_Z) * 0.5
+const TRAFFIC_START_Z := CITY_GROUND_FAR_Z
 const TRAFFIC_END_Z := 50.0
+const TRAFFIC_SPAWN_Z := [
+	-635.0, -617.0, -568.0, -539.0, -493.0, -477.0,
+	-407.0, -390.0, -347.0, -312.0, -269.0, -243.0,
+	-198.0, -160.0, -119.0, -91.0, -41.0, -18.0,
+]
 const STORIES := [
 	"The skyline waits ahead. Find your balance and take the first step.",
 	"Even the birds doubt you. Let them watch you prove them wrong.",
@@ -54,6 +76,11 @@ var gust_flag: Node3D
 var snow: CPUParticles3D
 var gust_snow: CPUParticles3D
 var traffic_lights: Array[Node3D] = []
+var _static_light_halos: Array[Dictionary] = []
+var _red_beacons: Array[Dictionary] = []
+var _red_beacon_elapsed := 0.0
+var _halo_material: StandardMaterial3D
+var _halo_quad: QuadMesh
 var _snow_gust_active := false
 var _bird_snow_remaining := 0.0
 var _bird_snow_direction := 0
@@ -97,6 +124,7 @@ func _ready() -> void:
 	camera.position = camera_position
 	camera.look_at(camera_look)
 	hud = HudScene.new()
+	hud.layer = 3
 	add_child(hud)
 	hud.replay_requested.connect(_restart)
 	hud.stargaze_requested.connect(_stargaze)
@@ -113,6 +141,7 @@ func _process(delta: float) -> void:
 		_restart()
 	if paused:
 		return
+	_update_red_beacons(delta)
 	if mode == "intro":
 		intro_elapsed += dt
 		if Input.is_action_just_pressed("skip_intro") or (_step_pressed() and intro_elapsed >= 2.0):
@@ -173,6 +202,24 @@ func _process(delta: float) -> void:
 	snow.position = camera.position + Vector3(0.0, 16.0, -18.0)
 	_update_snowfall(dt)
 	_update_hud()
+
+
+func _update_red_beacons(dt: float) -> void:
+	_red_beacon_elapsed = fmod(_red_beacon_elapsed + dt, RED_BEACON_PERIOD)
+	for beacon in _red_beacons:
+		var flashing: bool = fmod(_red_beacon_elapsed + beacon["phase"], RED_BEACON_PERIOD) < RED_BEACON_FLASH_DURATION
+		var bulb: MeshInstance3D = beacon["bulb"]
+		if bulb.visible == flashing:
+			continue
+		var light: OmniLight3D = beacon["light"]
+		var halo: MeshInstance3D = beacon["halo"]
+		var snow_glow: MeshInstance3D = beacon["snow_glow"]
+		var cap_glow: MeshInstance3D = beacon["cap_glow"]
+		bulb.visible = flashing
+		light.visible = flashing
+		halo.visible = flashing
+		snow_glow.visible = flashing
+		cap_glow.visible = flashing
 
 
 func _step(foot: String = "") -> void:
@@ -437,8 +484,10 @@ func _update_ropes() -> void:
 			var cylinder: CylinderMesh = segment.mesh
 			cylinder.height = direction.length() + 0.06
 			var material: StandardMaterial3D = segment.material_override
-			material.albedo_color = ROPE_COLOR.lerp(HOT_COLOR, rules.tension * rules.tension if index + 1 == rules.tower else 0.0)
+			var heat: float = rules.tension * rules.tension if index + 1 == rules.tower else 0.0
+			material.albedo_color = ROPE_COLOR.lerp(HOT_COLOR, heat)
 			material.emission = material.albedo_color
+			material.emission_energy_multiplier = lerpf(ROPE_BASE_EMISSION, ROPE_HOT_EMISSION, heat)
 			previous = next
 
 
@@ -540,38 +589,59 @@ func _build_world() -> void:
 	var environment := WorldEnvironment.new()
 	environment.name = "Night Environment"
 	var resource := Environment.new()
-	resource.background_mode = Environment.BG_COLOR
-	resource.background_color = Color("12122c")
+	var horizon_color := Color("12122c")
+	var sky_material := ShaderMaterial.new()
+	sky_material.shader = NightSkyShader
+	sky_material.set_shader_parameter("sky_top_color", Color("08091b"))
+	sky_material.set_shader_parameter("horizon_color", horizon_color)
+	var night_sky := Sky.new()
+	night_sky.sky_material = sky_material
+	resource.background_mode = Environment.BG_SKY
+	resource.sky = night_sky
 	resource.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	resource.ambient_light_color = Color("5c5c9c")
-	resource.ambient_light_energy = 0.65
+	resource.ambient_light_energy = 0.10
 	resource.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	resource.tonemap_exposure = 1.1
+	resource.tonemap_exposure = .85
 	resource.glow_enabled = true
-	resource.glow_intensity = 0.3
-	resource.glow_strength = 0.8
-	resource.glow_bloom = 0.05
-	resource.glow_hdr_threshold = 1.05
+	resource.glow_intensity = 0.85
+	resource.glow_strength = .82
+	resource.glow_bloom = 0.0
+	resource.glow_hdr_threshold = 1.2
+	resource.glow_hdr_scale = 0.7
 	resource.ssao_enabled = true
-	resource.ssao_intensity = 0.65
+	resource.ssao_radius = 1.5
+	resource.ssao_intensity = 1.15
+	resource.ssao_power = 1.7
+	resource.ssao_detail = 0.7
 	resource.adjustment_enabled = true
 	resource.adjustment_brightness = 0.99
 	resource.adjustment_contrast = 1.04
 	resource.adjustment_saturation = 1.06
 	resource.fog_enabled = true
 	resource.fog_mode = Environment.FOG_MODE_DEPTH
-	resource.fog_light_color = Color("454a64")
-	resource.fog_density = 0.26
-	resource.fog_depth_begin = 85.0
-	resource.fog_depth_end = 340.0
+	resource.fog_light_color = horizon_color
+	resource.fog_density = 1.0
+	resource.fog_depth_begin = 45.0
+	resource.fog_depth_end = 260.0
 	resource.fog_height = -3.0
 	resource.fog_height_density = 0.04
-	resource.fog_sky_affect = 0.0
+	resource.fog_sky_affect = 0.005
 	environment.environment = resource
 	add_child(environment)
+	var night_layer := CanvasLayer.new()
+	night_layer.name = "Night Tint"
+	night_layer.layer = 1
+	var darkness := ColorRect.new()
+	darkness.name = "Full Screen Darkness"
+	darkness.set_anchors_preset(Control.PRESET_FULL_RECT)
+	darkness.color = Color(0.01, 0.015, 0.04, 0.22)
+	darkness.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	night_layer.add_child(darkness)
+	add_child(night_layer)
 	var vignette_layer := CanvasLayer.new()
 	vignette_layer.name = "Vignette"
-	vignette_layer.layer = 0
+	vignette_layer.layer = 2
 	var vignette := ColorRect.new()
 	vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
 	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -581,10 +651,30 @@ func _build_world() -> void:
 	vignette_layer.add_child(vignette)
 	add_child(vignette_layer)
 	var light := DirectionalLight3D.new()
+	light.name = "Moonlit Contact Shadows"
 	light.rotation_degrees = Vector3(-35.0, -20.0, 0.0)
 	light.light_color = Color("b5bbff")
-	light.light_energy = 1.2
+	light.light_energy = .2
+	light.shadow_enabled = true
+	light.shadow_bias = 0.02
+	light.shadow_normal_bias = 0.5
+	light.light_angular_distance = 0.3
+	light.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 	add_child(light)
+	_halo_material = _make_halo_material()
+	_halo_quad = QuadMesh.new()
+	_halo_quad.size = Vector2.ONE
+	var moon_glow := DirectionalLight3D.new()
+	moon_glow.name = "Moon Glow"
+	moon_glow.rotation_degrees = Vector3(-8.0, 215.0, 0.0)
+	moon_glow.light_color = Color("eed4dcff")
+	moon_glow.light_energy = 0.56
+	moon_glow.light_angular_distance = 1.8
+	moon_glow.sky_mode = DirectionalLight3D.SKY_MODE_SKY_ONLY
+	add_child(moon_glow)
+	sky_material.set_shader_parameter("moon_direction", moon_glow.global_transform.basis.z.normalized())
+	sky_material.set_shader_parameter("moon_color", moon_glow.light_color)
+	sky_material.set_shader_parameter("moon_strength", moon_glow.light_energy)
 	camera = Camera3D.new()
 	camera.current = true
 	camera.fov = 68.0
@@ -603,6 +693,7 @@ func _build_world() -> void:
 	_build_cityscape()
 	_build_city_ground()
 	_build_street_lights()
+	_build_static_light_halos()
 	_build_traffic()
 	for number in range(1, Rules.TOWER_COUNT + 1):
 		var pieces: Array = []
@@ -610,6 +701,7 @@ func _build_world() -> void:
 		var edge_anchor := _rope_point(number, 0.0, {})
 		var roof_mount := _city_box(self, roof_anchor - Vector3(0.0, 0.2, 0.0), Vector3(0.45, 0.4, 0.45), Color("a5bfd5"))
 		roof_mount.name = "Roof Rope Anchor %d" % number
+		_add_local_light(self, "Rope Anchor Light %d" % number, roof_anchor + Vector3(0.0, 0.55, 0.0), Color("ffd49a"), 0.75, 3.5)
 		var edge_mount := _city_box(self, edge_anchor - Vector3(0.0, 0.2, 0.0), Vector3(0.45, 0.4, 0.45), Color("a5bfd5"))
 		edge_mount.name = "Edge Rope Anchor %d" % number
 		for segment_number in range(ROPE_SEGMENTS + 1):
@@ -619,13 +711,14 @@ func _build_world() -> void:
 			mesh.bottom_radius = 0.16
 			mesh.height = 2.0
 			segment.mesh = mesh
-			segment.material_override = _material(ROPE_COLOR, false, 1.5)
+			segment.material_override = _material(ROPE_COLOR, false, ROPE_BASE_EMISSION)
 			add_child(segment)
 			pieces.append(segment)
 		ropes.append(pieces)
 	walker = Node3D.new()
 	add_child(walker)
 	_build_walker_visual()
+	_add_local_light(walker, "Stuntman Warm Light", Vector3(0.0, 2.2, 0.6), Color("ffc38e"), 0.8, 4.0)
 	_place_kenney_decor()
 	pole = MeshInstance3D.new()
 	var pole_mesh := CylinderMesh.new()
@@ -755,7 +848,9 @@ func _build_rooftop_skyscrapers() -> void:
 	towers.name = "Rooftop Skyscrapers"
 	add_child(towers)
 	var facade_colors := [Color("303149"), Color("292d46"), Color("36364d"), Color("252942"), Color("303149")]
-	var glass_colors := [Color("a5bfd5"), Color("f7ca76"), Color("e8a96b"), Color("596c8c")]
+	var glass_colors := [Color("ffa256ff"), Color("fcc961ff"), Color("f2a45aff"), Color("ffb356ff")]
+	var window_rng := RandomNumberGenerator.new()
+	window_rng.seed = 84021
 	var roof_y := FEET_Y - 0.5
 	var roof_thickness := 0.4
 	var facade_height := roof_y + 12.0 - roof_thickness * 0.5
@@ -791,10 +886,38 @@ func _build_rooftop_skyscrapers() -> void:
 				var offset := (float(column) - 1.0) * 5.0
 				var glass: Color = glass_colors[(number + floor_number + column) % glass_colors.size()]
 				for side in [-1.0, 1.0]:
-					_city_box(tower, Vector3(offset, y, side * 10.04), Vector3(2.8, 2.2, 0.12), glass, true, 2.0)
-					_city_box(tower, Vector3(side * 8.54, y, offset * 1.25), Vector3(0.12, 2.2, 2.8), glass, true, 2.0)
+					var front_lit: bool = window_rng.randf() < LIT_WINDOW_CHANCE or ((number == 1 or number == 3) and floor_number == 10 and column == 1 and side > 0.0)
+					var side_lit: bool = window_rng.randf() < LIT_WINDOW_CHANCE
+					_city_box(tower, Vector3(offset, y, side * 10.04), Vector3(2.8, 2.2, 0.12), glass if front_lit else DARK_WINDOW_COLOR, false, WINDOW_GLOW_ENERGY if front_lit else 0.0)
+					_city_box(tower, Vector3(side * 8.54, y, offset * 1.25), Vector3(0.12, 2.2, 2.8), glass if side_lit else DARK_WINDOW_COLOR, false, WINDOW_GLOW_ENERGY if side_lit else 0.0)
+					if front_lit:
+						_queue_light_halo(tower, Vector3(offset, y, side * 10.16), Vector2(4.2, 3.4), Color(glass.r, glass.g, glass.b, 0.65))
+					if side_lit:
+						_queue_light_halo(tower, Vector3(side * 8.66, y, offset * 1.25), Vector2(4.2, 3.4), Color(glass.r, glass.g, glass.b, 0.65))
+		if number == 1 or number == 3:
+			_add_local_light(tower, "Upper Window Light", Vector3(0.0, 38.0, 10.45), Color("ffcd60ff"), 0.9, 5.5)
 		if number == Rules.TOWER_COUNT + 1:
-			_city_box(tower, Vector3(6.5, roof_y + 3.0, 6.5), Vector3(0.3, 6.0, 0.3), Color("a5bfd5"))
+			var roof_spike := _city_box(tower, Vector3(6.5, roof_y + 1.5, 6.5), Vector3(0.12, 3.0, 0.12), ROOF_SPIKE_COLOR)
+			roof_spike.name = "Finish Roof Beacon Pole"
+			var spike_base := _roof_spike_base(tower, Vector3(6.5, roof_y + SNOW_LAYER_THICKNESS, 6.5), Color("e1ebf2"), 9001)
+			spike_base.name = "Finish Roof Spike Base"
+			var beacon_position := Vector3(6.5, roof_y + 3.18, 6.5)
+			var beacon_color := Color("e9d3a0ff")
+			var bulb := MeshInstance3D.new()
+			var bulb_mesh := SphereMesh.new()
+			bulb_mesh.radius = 0.18
+			bulb_mesh.height = 0.36
+			bulb.mesh = bulb_mesh
+			bulb.name = "Finish Roof Beacon"
+			bulb.material_override = _material(beacon_color, false, STREETLAMP_GLOW_ENERGY)
+			bulb.position = beacon_position
+			tower.add_child(bulb)
+			_add_local_light(tower, "Finish Roof Beacon Light", beacon_position, beacon_color, 1.2, 7.5)
+			_queue_light_halo(tower, beacon_position, Vector2(1.35, 1.35), Color(beacon_color.r, beacon_color.g, beacon_color.b, 0.75))
+			var cap_glow := _add_roof_snow_glow(spike_base, Vector3(0.0, 0.83, 0.0), 1.0, Color(beacon_color.r, beacon_color.g, beacon_color.b, 0.8))
+			cap_glow.name = "Finish Spike Base Cap Glow"
+			var snow_glow := _add_roof_snow_glow(tower, Vector3(beacon_position.x, roof_y + SNOW_LAYER_THICKNESS + 0.03, beacon_position.z), 9.0, Color(beacon_color.r, beacon_color.g, beacon_color.b, 0.6))
+			snow_glow.name = "Finish Roof Snow Glow"
 
 
 func _build_cityscape() -> void:
@@ -803,51 +926,97 @@ func _build_cityscape() -> void:
 	add_child(city)
 	var skyline_rng := RandomNumberGenerator.new()
 	skyline_rng.seed = 49021
+	var distant_rng := RandomNumberGenerator.new()
+	distant_rng.seed = 73011
 	var walls := [Color("252942"), Color("303149"), Color("36364d"), Color("292d46")]
-	var windows := [Color("f7ca76"), Color("e8a96b"), Color("a5bfd5")]
+	var windows := [Color("f9e15bff"), Color("ffbe9dff"), Color("ffc473ff")]
 	for side_index in 2:
 		var side := -1.0 if side_index == 0 else 1.0
 		for row in 2:
 			var distance := 49.0 + row * 28.0
-			for index in 25:
+			for index in 42:
+				var building_rng := skyline_rng if index < 25 else distant_rng
+				var window_rng := RandomNumberGenerator.new()
+				window_rng.seed = 73017 + side_index * 100000 + row * 10000 + index
 				var z := 39.0 - index * 17.0 - row * 7.0
-				var height := skyline_rng.randf_range(22.0, 56.0) + row * 8.0
-				var width := skyline_rng.randf_range(12.0, 18.0)
-				var depth := skyline_rng.randf_range(11.0, 17.0)
-				var x := side * (distance + skyline_rng.randf_range(-4.0, 4.0))
-				var building := _city_box(city, Vector3(x, -12.0 + height * 0.5, z), Vector3(width, height, depth), walls[skyline_rng.randi_range(0, walls.size() - 1)])
+				var height := building_rng.randf_range(22.0, 56.0) + row * 8.0
+				var width := building_rng.randf_range(12.0, 18.0)
+				var depth := building_rng.randf_range(11.0, 17.0)
+				var x := side * (distance + building_rng.randf_range(-4.0, 4.0))
+				var building := _city_box(city, Vector3(x, -12.0 + height * 0.5, z), Vector3(width, height, depth), walls[building_rng.randi_range(0, walls.size() - 1)])
 				building.name = "Building %d %d %d" % [int(side), row, index]
 				var snow_color := Color("d1dee8") if row == 0 else Color("b8c9d8")
 				var roof_snow := _snow_cap(city, Vector3(x, -12.0 + height, z), Vector2(width - 0.3, depth - 0.3), snow_color, side_index * 100 + row * 25 + index)
 				roof_snow.name = "Building Snow %d %d %d" % [int(side), row, index]
 				var inner_face := x - side * (width * 0.5 + 0.04)
 				for floor_number in range(2, int(height / 5.0)):
-					if skyline_rng.randf() < 0.28:
+					if building_rng.randf() < 0.28:
 						continue
 					for column in 2:
 						var pane_z := z + (float(column) - 0.5) * depth * 0.38
-						_city_box(city, Vector3(inner_face, -12.0 + floor_number * 5.0, pane_z), Vector3(0.12, 1.55, 1.2), windows[skyline_rng.randi_range(0, windows.size() - 1)], true, 2.0)
-				if skyline_rng.randf() < 0.3:
-					_city_box(city, Vector3(x, -12.0 + height + 2.5, z), Vector3(0.25, 5.0, 0.25), Color("7c829e"))
+						var window_color: Color = windows[building_rng.randi_range(0, windows.size() - 1)]
+						var window_position := Vector3(inner_face, -12.0 + floor_number * 5.0, pane_z)
+						var lit: bool = window_rng.randf() < LIT_WINDOW_CHANCE
+						_city_box(city, window_position, Vector3(0.12, 1.55, 1.2), window_color if lit else DARK_WINDOW_COLOR, false, WINDOW_GLOW_ENERGY if lit else 0.0)
+						if lit:
+							_queue_light_halo(city, window_position - Vector3(side * 0.12, 0.0, 0.0), Vector2(3.2, 2.3), Color(window_color.r, window_color.g, window_color.b, 0.6))
+				var beacon_slot: bool = row == 0 and index in BEACON_BUILDING_INDICES
+				var has_spike: bool = building_rng.randf() < 0.3
+				if has_spike or beacon_slot:
+					var spike := _city_box(city, Vector3(x, -12.0 + height + 2.5, z), Vector3(0.14, 5.0, 0.14), ROOF_SPIKE_COLOR)
+					spike.name = "City Roof Spike %d %d %d" % [side_index, row, index]
+					var spike_base := _roof_spike_base(city, Vector3(x, -12.0 + height + SNOW_LAYER_THICKNESS, z), snow_color, side_index * 1000 + row * 100 + index)
+					spike_base.name = "City Roof Spike Base %d %d %d" % [side_index, row, index]
+					var beacon_color := Color("ff5048") if (index + side_index + row) % 2 == 1 else Color("ffca88")
+					var beacon_position := Vector3(x, -12.0 + height + 5.12, z)
+					var bulb := MeshInstance3D.new()
+					var bulb_mesh := SphereMesh.new()
+					bulb_mesh.radius = 0.18
+					bulb_mesh.height = 0.36
+					bulb.mesh = bulb_mesh
+					bulb.name = "Roof Beacon %d %d %d" % [side_index, row, index]
+					bulb.material_override = _material(beacon_color, false, STREETLAMP_GLOW_ENERGY)
+					bulb.position = beacon_position
+					city.add_child(bulb)
+					var is_red := beacon_color.g < 0.5
+					var beacon_light := _add_local_light(city, "Roof Beacon Light %d %d %d" % [side_index, row, index], beacon_position, beacon_color, 0.55 if is_red else 1.2, 6.5 if is_red else 7.5)
+					var halo_color := Color(beacon_color.r, beacon_color.g, beacon_color.b, 0.75)
+					var cap_glow := _add_roof_snow_glow(spike_base, Vector3(0.0, 0.83, 0.0), 1.0, Color(beacon_color.r, beacon_color.g, beacon_color.b, 0.4 if is_red else 0.8))
+					cap_glow.name = "Spike Base Cap Glow"
+					var snow_glow := _add_roof_snow_glow(city, Vector3(x, -12.0 + height + SNOW_LAYER_THICKNESS + 0.03, z), 5.5 if is_red else 9.0, Color(beacon_color.r, beacon_color.g, beacon_color.b, 0.28 if is_red else 0.6))
+					snow_glow.name = "Roof Snow Glow %d %d %d" % [side_index, row, index]
+					if is_red:
+						var halo := _add_light_halo(city, beacon_position, Vector2(1.35, 1.35), halo_color)
+						halo.name = "Roof Beacon Halo %d %d %d" % [side_index, row, index]
+						var phase := fmod(float(_red_beacons.size()) * 0.43, RED_BEACON_PERIOD)
+						var flashing: bool = phase < RED_BEACON_FLASH_DURATION
+						bulb.visible = flashing
+						beacon_light.visible = flashing
+						halo.visible = flashing
+						snow_glow.visible = flashing
+						cap_glow.visible = flashing
+						_red_beacons.append({"bulb": bulb, "light": beacon_light, "halo": halo, "snow_glow": snow_glow, "cap_glow": cap_glow, "phase": phase})
+					else:
+						_queue_light_halo(city, beacon_position, Vector2(1.35, 1.35), halo_color)
 
 
 func _build_city_ground() -> void:
 	var ground := Node3D.new()
 	ground.name = "City Ground"
 	add_child(ground)
-	var street := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y - 0.5, -190.0), Vector3(78.0, 1.0, 500.0), Color("252a39"))
+	var street := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y - 0.5, CITY_GROUND_CENTER_Z), Vector3(78.0, 1.0, CITY_GROUND_LENGTH), Color("252a39"))
 	street.name = "Asphalt Street"
-	var street_snow := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y + GROUND_SNOW_THICKNESS * 0.5, -190.0), Vector3(77.5, GROUND_SNOW_THICKNESS, 499.5), Color("c5d1dc"))
+	var street_snow := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y + GROUND_SNOW_THICKNESS * 0.5, CITY_GROUND_CENTER_Z), Vector3(77.5, GROUND_SNOW_THICKNESS, CITY_GROUND_LENGTH - 0.5), Color("c5d1dc"))
 	street_snow.name = "Street Snow"
 	for side_index in 2:
 		var side := -1.0 if side_index == 0 else 1.0
-		var sidewalk := _city_box(ground, Vector3(side * 42.0, -12.25, -190.0), Vector3(8.0, 1.5, 500.0), Color("51566b"))
+		var sidewalk := _city_box(ground, Vector3(side * 42.0, -12.25, CITY_GROUND_CENTER_Z), Vector3(8.0, 1.5, CITY_GROUND_LENGTH), Color("51566b"))
 		sidewalk.name = "Sidewalk %d" % side_index
 		var sidewalk_top := sidewalk.position.y + (sidewalk.mesh as BoxMesh).size.y * 0.5
-		var sidewalk_snow := _city_box(ground, Vector3(side * 42.0, sidewalk_top + GROUND_SNOW_THICKNESS * 0.5, -190.0), Vector3(7.8, GROUND_SNOW_THICKNESS, 499.5), Color("d6e0e8"))
+		var sidewalk_snow := _city_box(ground, Vector3(side * 42.0, sidewalk_top + GROUND_SNOW_THICKNESS * 0.5, CITY_GROUND_CENTER_Z), Vector3(7.8, GROUND_SNOW_THICKNESS, CITY_GROUND_LENGTH - 0.5), Color("d6e0e8"))
 		sidewalk_snow.name = "Sidewalk Snow %d" % side_index
-		_city_box(ground, Vector3(side * 38.0, -11.7, -190.0), Vector3(0.6, 0.3, 500.0), Color("9a9bae"))
-		for index in 27:
+		_city_box(ground, Vector3(side * 38.0, -11.7, CITY_GROUND_CENTER_Z), Vector3(0.6, 0.3, CITY_GROUND_LENGTH), Color("9a9bae"))
+		for index in 40:
 			var z := 49.0 - index * 18.0
 			_city_box(ground, Vector3(side * 13.0, STREET_SURFACE_Y + GROUND_SNOW_THICKNESS + 0.01, z), Vector3(0.35, 0.02, 7.0), Color("d4b77b"), true)
 
@@ -856,7 +1025,7 @@ func _build_street_lights() -> void:
 	var lamps := Node3D.new()
 	lamps.name = "Street Lights"
 	add_child(lamps)
-	for index in 9:
+	for index in 15:
 		var z := 30.0 - index * 48.0
 		for side in [-1.0, 1.0]:
 			var lamp := Node3D.new()
@@ -864,7 +1033,8 @@ func _build_street_lights() -> void:
 			lamps.add_child(lamp)
 			_city_box(lamp, Vector3(0.0, 2.8, 0.0), Vector3(0.18, 5.6, 0.18), Color("4a4b5c"))
 			_city_box(lamp, Vector3(-side * 0.65, 5.55, 0.0), Vector3(1.3, 0.13, 0.13), Color("4a4b5c"))
-			_city_box(lamp, Vector3(-side * 1.3, 5.45, 0.0), Vector3(0.7, 0.18, 0.5), Color("ffce83"), true, 3.0)
+			_city_box(lamp, Vector3(-side * 1.3, 5.45, 0.0), Vector3(0.7, 0.18, 0.5), Color("ffce83"), false, STREETLAMP_GLOW_ENERGY)
+			_queue_light_halo(lamp, Vector3(-side * 1.3, 5.45, 0.0), Vector2(2.2, 2.2), Color(1.0, 0.8, 0.5, 0.9))
 			if index % 2 == 0:
 				var glow := OmniLight3D.new()
 				glow.position = Vector3(-side * 1.3, 5.2, 0.0)
@@ -878,15 +1048,17 @@ func _build_traffic() -> void:
 	var traffic := Node3D.new()
 	traffic.name = "Street Traffic"
 	add_child(traffic)
-	for index in 10:
+	for index in TRAFFIC_SPAWN_Z.size():
 		var direction := 1.0 if index % 2 == 0 else -1.0
 		var car := Node3D.new()
-		car.position = Vector3(-17.0 if direction > 0.0 else 17.0, -11.65, -395.0 + float(index / 2) * 85.0 + float(index % 2) * 18.0)
+		car.position = Vector3(-17.0 if direction > 0.0 else 17.0, -11.65, TRAFFIC_SPAWN_Z[index])
 		traffic.add_child(car)
 		_city_box(car, Vector3(0.0, 0.22, 0.0), Vector3(2.2, 0.55, 3.5), Color("252a36"))
 		for side in [-1.0, 1.0]:
-			_city_box(car, Vector3(side * 0.75, 0.48, direction * 1.8), Vector3(0.38, 0.22, 0.16), Color("fff0c3"), true, 3.0)
-			_city_box(car, Vector3(side * 0.75, 0.48, -direction * 1.8), Vector3(0.38, 0.22, 0.16), Color("ff625b"), true, 2.5)
+			_city_box(car, Vector3(side * 0.75, 0.48, direction * 1.8), Vector3(0.38, 0.22, 0.16), Color("fff0c3"), false, HEADLIGHT_GLOW_ENERGY)
+			_city_box(car, Vector3(side * 0.75, 0.48, -direction * 1.8), Vector3(0.38, 0.22, 0.16), Color("ff625b"), false, TAILLIGHT_GLOW_ENERGY)
+			_add_light_halo(car, Vector3(side * 0.75, 0.48, direction * 1.91), Vector2(1.2, 1.0), Color("fff0c3"))
+			_add_light_halo(car, Vector3(side * 0.75, 0.48, -direction * 1.91), Vector2(1.1, 0.9), Color("ff625b"))
 		traffic_lights.append(car)
 
 
@@ -940,6 +1112,34 @@ func _snow_cap(parent: Node3D, at: Vector3, size: Vector2, color: Color, seed_va
 	return node
 
 
+func _roof_spike_base(parent: Node3D, at: Vector3, snow_color: Color, seed_value: int) -> Node3D:
+	var base := Node3D.new()
+	base.position = at
+	parent.add_child(base)
+	var pedestal := MeshInstance3D.new()
+	pedestal.name = "Metal Cylinder"
+	var pedestal_mesh := CylinderMesh.new()
+	pedestal_mesh.top_radius = 0.48
+	pedestal_mesh.bottom_radius = 0.48
+	pedestal_mesh.height = 0.7
+	pedestal.mesh = pedestal_mesh
+	pedestal.material_override = _material(ROOF_SPIKE_COLOR)
+	pedestal.position.y = 0.35
+	base.add_child(pedestal)
+	var snow_cap := MeshInstance3D.new()
+	snow_cap.name = "Snow Cap"
+	var snow_mesh := CylinderMesh.new()
+	var snow_radius := 0.58 + 0.025 * sin(float(seed_value) * 0.73)
+	snow_mesh.top_radius = snow_radius - 0.035
+	snow_mesh.bottom_radius = snow_radius
+	snow_mesh.height = 0.13
+	snow_cap.mesh = snow_mesh
+	snow_cap.material_override = _material(snow_color)
+	snow_cap.position.y = 0.745
+	base.add_child(snow_cap)
+	return base
+
+
 func _snow_triangle(surface: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
 	surface.add_vertex(a)
 	surface.add_vertex(c)
@@ -955,6 +1155,83 @@ func _city_box(parent: Node3D, at: Vector3, size: Vector3, color: Color, unshade
 	node.position = at
 	parent.add_child(node)
 	return node
+
+
+func _queue_light_halo(parent: Node3D, at: Vector3, size: Vector2, color: Color) -> void:
+	_static_light_halos.append({"position": parent.to_global(at), "size": size, "color": color})
+
+
+func _build_static_light_halos() -> void:
+	var instances := MultiMesh.new()
+	instances.transform_format = MultiMesh.TRANSFORM_3D
+	instances.use_colors = true
+	instances.mesh = _halo_quad
+	instances.instance_count = _static_light_halos.size()
+	for index in instances.instance_count:
+		var halo: Dictionary = _static_light_halos[index]
+		var size: Vector2 = halo["size"]
+		var at: Vector3 = halo["position"]
+		instances.set_instance_transform(index, Transform3D(Basis().scaled(Vector3(size.x, size.y, 1.0)), at))
+		instances.set_instance_color(index, halo["color"])
+	var node := MultiMeshInstance3D.new()
+	node.name = "Window and Streetlamp Halos"
+	node.multimesh = instances
+	node.material_override = _halo_material
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(node)
+	_static_light_halos.clear()
+
+
+func _add_light_halo(parent: Node3D, at: Vector3, size: Vector2, color: Color) -> MeshInstance3D:
+	var node := MeshInstance3D.new()
+	node.name = "Vehicle Light Halo %d" % parent.get_child_count()
+	node.mesh = _halo_quad
+	var tinted_material := _halo_material.duplicate() as StandardMaterial3D
+	tinted_material.albedo_color = color
+	node.material_override = tinted_material
+	node.position = at
+	node.scale = Vector3(size.x, size.y, 1.0)
+	node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(node)
+	return node
+
+
+func _add_roof_snow_glow(parent: Node3D, at: Vector3, diameter: float, color: Color) -> MeshInstance3D:
+	var glow := _add_light_halo(parent, at, Vector2(diameter, diameter), color)
+	(glow.material_override as StandardMaterial3D).billboard_mode = BaseMaterial3D.BILLBOARD_DISABLED
+	glow.rotation.x = -PI * 0.5
+	return glow
+
+
+func _make_halo_material() -> StandardMaterial3D:
+	var image := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	for y in 64:
+		for x in 64:
+			var uv := (Vector2(float(x) + 0.5, float(y) + 0.5) / 64.0 - Vector2(0.5, 0.5)) * 2.0
+			var alpha := pow(1.0 - smoothstep(0.0, 1.0, uv.length()), 2.0) * 0.58
+			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, alpha))
+	var material := StandardMaterial3D.new()
+	material.albedo_texture = ImageTexture.create_from_image(image)
+	material.albedo_color = Color.WHITE
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	material.billboard_keep_scale = true
+	material.vertex_color_use_as_albedo = true
+	return material
+
+
+func _add_local_light(parent: Node3D, light_name: String, at: Vector3, color: Color, energy: float, radius: float) -> OmniLight3D:
+	var light := OmniLight3D.new()
+	light.name = light_name
+	light.position = at
+	light.light_color = color
+	light.light_energy = energy
+	light.omni_range = radius
+	light.omni_attenuation = 2.0
+	parent.add_child(light)
+	return light
 
 
 func _material(color: Color, unshaded: bool = false, emission_energy: float = 0.0) -> StandardMaterial3D:

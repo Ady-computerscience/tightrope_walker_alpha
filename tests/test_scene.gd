@@ -440,7 +440,7 @@ func _process(_delta: float) -> bool:
 	var street_lights := game.get_node_or_null("Street Lights")
 	var traffic := game.get_node_or_null("Street Traffic")
 	var cars: Array = game.get("traffic_lights")
-	if street_lights == null or street_lights.get_child_count() < 10 or traffic == null or cars.size() != 10:
+	if street_lights == null or street_lights.get_child_count() < 10 or traffic == null or cars.size() != 18:
 		printerr("FAIL: street lights or traffic were not built")
 		quit(1)
 		return true

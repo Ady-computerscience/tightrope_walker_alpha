@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://vvhmykn4g7od"]
 
-[ext_resource type="Script" path="res://scripts/game.gd" id="1"]
+[ext_resource type="Script" uid="uid://bm32qvqey51r5" path="res://scripts/game.gd" id="1"]
 
-[node name="TightropeWalker" type="Node3D"]
+[node name="TightropeWalker" type="Node3D" unique_id=1764633579]
 script = ExtResource("1")
