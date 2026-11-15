@@ -506,6 +506,13 @@ func _process(_delta: float) -> bool:
 				printerr("FAIL: roof and edge rope anchors are not connected on tower %d" % tower_number)
 				quit(1)
 				return true
+			var first_segment := rope_segments[0] as MeshInstance3D
+			var last_segment := rope_segments[26] as MeshInstance3D
+			var rope_mesh := first_segment.mesh as CylinderMesh
+			if not is_equal_approx(rope_mesh.top_radius, 0.045) or not is_equal_approx(rope_mesh.bottom_radius, 0.045) or first_segment.position.distance_to((roof_anchor + edge_anchor) * 0.5) > 0.1 or last_segment.position.z > Rules.tower_z(tower_number) - Rules.ROPE_START_OFFSET - Rules.ROPE_LENGTH + 2.0:
+				printerr("FAIL: thin rope span %d was not positioned at startup" % tower_number)
+				quit(1)
+				return true
 			var parked_rope := Rules.rope_at(start_z)
 			var walking_rope := Rules.rope_at(Rules.step_z(tower_number, 4))
 			var parked_midpoint: Vector3 = game.call("_rope_point", tower_number, 0.5, parked_rope)
@@ -517,7 +524,7 @@ func _process(_delta: float) -> bool:
 			var near_edge_z := front_edge - 1.0
 			var near_edge_progress := (Rules.tower_z(tower_number) - Rules.ROPE_START_OFFSET - near_edge_z) / Rules.ROPE_LENGTH
 			var near_edge_point: Vector3 = game.call("_rope_point", tower_number, near_edge_progress, edge_loaded_rope)
-			if near_edge_point.y - 0.16 <= roof.global_position.y + roof_mesh.size.y * 0.5:
+			if near_edge_point.y - 0.045 <= roof.global_position.y + roof_mesh.size.y * 0.5:
 				printerr("FAIL: loaded rope clips the roof edge on tower %d" % tower_number)
 				quit(1)
 				return true
@@ -610,7 +617,7 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	var pole: MeshInstance3D = game.get("pole")
-	if pole == null or not is_equal_approx(pole.position.y, 1.15) or not is_equal_approx(pole.position.z, -0.42) or absf(pole.transform.basis.y.x) < 0.95:
+	if pole == null or not is_equal_approx(pole.position.y, 1.15) or not is_equal_approx(pole.position.z, -0.42) or absf(pole.transform.basis.y.x) < 0.95 or not is_equal_approx((pole.mesh as CylinderMesh).top_radius, 0.055) or not is_equal_approx((pole.material_override as StandardMaterial3D).metallic, 1.0):
 		printerr("FAIL: balance pole is not horizontal in front of the waist")
 		quit(1)
 		return true

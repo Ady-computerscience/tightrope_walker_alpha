@@ -20,6 +20,8 @@ const ROPE_Y := 44.87
 const STATIC_SAG := 0.25
 const LOAD_SAG := 0.9
 const ROPE_SEGMENTS := 26
+const ROPE_RADIUS := 0.045
+const BALANCE_POLE_RADIUS := 0.055
 const ROPE_COLOR := Color("b5a38b")
 const HOT_COLOR := Color("ff5c46")
 const ROPE_BASE_EMISSION := 0.4
@@ -152,6 +154,7 @@ func _ready() -> void:
 	rules = Rules.new()
 	visual_z = Rules.step_z(1, 0)
 	_build_world()
+	_update_ropes()
 	_update_atmosphere(0.0)
 	_update_walker(0.0)
 	camera_position = INTRO_START_POSITION
@@ -507,9 +510,6 @@ func _update_snowfall(dt: float = 0.0) -> void:
 func _update_ropes() -> void:
 	var current := Rules.rope_at(visual_z)
 	for index in range(Rules.TOWER_COUNT):
-		var active: bool = index + 1 == rules.tower or (not current.is_empty() and index + 1 == current["tower"])
-		if not active:
-			continue
 		var segments: Array = ropes[index]
 		var previous := _roof_anchor_point(index + 1)
 		for part in range(ROPE_SEGMENTS + 1):
@@ -817,8 +817,8 @@ func _build_world() -> void:
 		for segment_number in range(ROPE_SEGMENTS + 1):
 			var segment := MeshInstance3D.new()
 			var mesh := CylinderMesh.new()
-			mesh.top_radius = 0.16
-			mesh.bottom_radius = 0.16
+			mesh.top_radius = ROPE_RADIUS
+			mesh.bottom_radius = ROPE_RADIUS
 			mesh.height = 2.0
 			segment.mesh = mesh
 			segment.material_override = _material(ROPE_COLOR, false, ROPE_BASE_EMISSION)
@@ -832,11 +832,14 @@ func _build_world() -> void:
 	_place_kenney_decor()
 	pole = MeshInstance3D.new()
 	var pole_mesh := CylinderMesh.new()
-	pole_mesh.top_radius = 0.11
-	pole_mesh.bottom_radius = 0.11
+	pole_mesh.top_radius = BALANCE_POLE_RADIUS
+	pole_mesh.bottom_radius = BALANCE_POLE_RADIUS
 	pole_mesh.height = 13.0
 	pole.mesh = pole_mesh
-	pole.material_override = _material(Color("966038"))
+	var pole_material := _material(Color("c8d0d8"))
+	pole_material.metallic = 1.0
+	pole_material.roughness = 0.3
+	pole.material_override = pole_material
 	pole.rotation.z = PI * 0.5
 	pole.position = Vector3(0.0, POLE_WAIST_Y, POLE_FRONT_Z)
 	walker.add_child(pole)
