@@ -110,17 +110,41 @@ func _test_birds() -> void:
 	var events := run.update(1.0 / 60.0, 0.0)
 	_check(events.size() == 1 and events[0]["type"] == "birds" and run.bird_phase == "approach", "birds approach before warning")
 	_check(run.bird_entry_side == -1 or run.bird_entry_side == 1, "birds enter from a side")
-	_check(run.bird_dirs[1] == run.bird_dir, "middle bird indicates target lean")
-	run.tilt = -0.3 * run.bird_dir
+	_check(run.bird_dirs == [-run.bird_dir, run.bird_dir, -run.bird_dir], "both flankers point opposite the center bird")
 	run.bird_timer = Rules.BIRD_APPROACH * 0.5
 	events = run.update(1.0 / 60.0, 0.0)
-	_check(run.bird_phase == "approach" and events.is_empty(), "wrong lean is not checked during approach")
+	_check(run.bird_phase == "approach" and events.is_empty() and is_zero_approx(run.bird_gust_timer), "gust does not trigger during approach")
 	run.bird_timer = 0.0
 	events = run.update(1.0 / 60.0, 0.0)
-	_check(run.bird_phase == "warn" and is_equal_approx(run.bird_timer, Rules.BIRD_WARN) and events.size() == 1 and events[0]["type"] == "birds_arrived", "reaction countdown starts when birds arrive")
+	_check(run.bird_phase == "warn" and is_equal_approx(run.bird_timer, 1.0) and events.size() == 1 and events[0]["type"] == "birds_arrived", "one-second reaction countdown starts when birds arrive")
+	run.update(1.0 / 60.0, -float(run.bird_dir))
+	_check(run.bird_response == -run.bird_dir and is_zero_approx(run.bird_gust_timer), "wrong response is recorded without an early gust")
 	run.bird_timer = 0.0
+	run.tilt_vel = 0.0
 	events = run.update(1.0 / 60.0, 0.0)
-	_check(run.state == "falling" and events.back().get("reason") == "birds", "wrong lean falls")
+	_check(run.state == "falling" and run.fall_dir == -run.bird_dir and events.back().get("reason") == "birds", "wrong lean falls in gust direction")
+	_check(events.any(func(event: Dictionary) -> bool: return event["type"] == "bird_gust" and event["dir"] == -run.bird_dir), "gust triggers after wrong response countdown")
+	_check(run.tilt_vel * run.bird_dir < 0.0, "bird gust pushes opposite the center bird")
+	var correct := Rules.new(5)
+	correct.tower = 2
+	correct.bird_phase = "warn"
+	correct.bird_timer = Rules.BIRD_WARN
+	correct.bird_dir = 1
+	correct.update(1.0 / 60.0, 1.0)
+	_check(correct.bird_response == 1 and correct.state == "walking" and is_zero_approx(correct.bird_gust_timer), "correct lean is recorded during reaction window")
+	correct.bird_timer = 0.0
+	correct.tilt_vel = 0.4
+	events = correct.update(1.0 / 60.0, 1.0)
+	_check(correct.state == "walking" and correct.bird_phase == "rest" and correct.bird_gust_timer > 0.0 and correct.tilt_vel < 0.0, "correct lean survives opposite-direction gust")
+	_check(events.any(func(event: Dictionary) -> bool: return event["type"] == "birds_pass") and events.any(func(event: Dictionary) -> bool: return event["type"] == "bird_gust" and event["dir"] == -1), "success emits pass and gust events")
+	correct.update(1.0 / 60.0, 1.0)
+	_check(correct.push < 0.0 and correct.bird_gust_timer < Rules.BIRD_GUST_DURATION, "bird gust continues briefly after countdown")
+	var idle := Rules.new(6)
+	idle.tower = 2
+	idle.bird_phase = "warn"
+	idle.bird_timer = 0.0
+	idle.update(1.0 / 60.0, 0.0)
+	_check(idle.state == "falling" and idle.fall_dir == -idle.bird_dir, "missing response fails in gust direction")
 	var saw_left := false
 	var saw_right := false
 	for seed_value in range(1, 25):
@@ -131,8 +155,8 @@ func _test_birds() -> void:
 		saw_left = saw_left or flock.bird_entry_side == -1
 		saw_right = saw_right or flock.bird_entry_side == 1
 	_check(saw_left and saw_right, "bird entry side varies across seeded rounds")
-	_check(Rules.bird_check(0.3, 1) and Rules.bird_check(-0.3, -1), "correct bird lean passes")
-	_check(not Rules.bird_check(0.02, 1), "small bird lean fails")
+	_check(Rules.bird_check(1, 1) and Rules.bird_check(-1, -1), "correct bird lean passes")
+	_check(not Rules.bird_check(0, 1) and not Rules.bird_check(-1, 1), "missing or wrong bird lean fails")
 
 
 func _test_tension() -> void:

@@ -17,9 +17,11 @@ const WIND_ENABLED := false
 const WIND_PUSH := 0.9
 const WIND_RAMP_TIME := 1.2
 const BIRD_APPROACH := 1.3
-const BIRD_WARN := 2.2
+const BIRD_WARN := 1.0
 const BIRD_REST := 1.6
-const BIRD_MARGIN := 0.1
+const BIRD_GUST_DURATION := 0.35
+const BIRD_GUST_PUSH := 1.1
+const BIRD_GUST_IMPULSE := 1.2
 const TENSION_RATE := 0.11
 const TENSION_PER_STEP := 0.07
 const TENSION_JITTER := 0.8
@@ -53,6 +55,8 @@ var bird_timer := 1.8
 var bird_dir := 1
 var bird_dirs := [1, 1, 1]
 var bird_entry_side := 1
+var bird_response := 0
+var bird_gust_timer := 0.0
 var tension := 0.0
 var sway := 0.0
 var push := 0.0
@@ -96,8 +100,8 @@ func stage_kind() -> String:
 	return STAGES[tower - 1]
 
 
-static func bird_check(current_tilt: float, direction: int) -> bool:
-	return current_tilt * direction >= BIRD_MARGIN
+static func bird_check(response_direction: int, direction: int) -> bool:
+	return response_direction == direction
 
 
 static func sway_safe(value: float) -> bool:
@@ -123,28 +127,38 @@ func update(delta: float, lean: float) -> Array[Dictionary]:
 			wind_ramp = minf(1.0, wind_ramp + dt / WIND_RAMP_TIME)
 			stage_push += wind_dir * WIND_PUSH * wind_ramp
 		"Birds":
+			if bird_gust_timer > 0.0:
+				bird_gust_timer = maxf(0.0, bird_gust_timer - dt)
+				stage_push -= bird_dir * BIRD_GUST_PUSH
 			bird_timer -= dt
 			if bird_phase == "rest" and bird_timer <= 0.0:
 				bird_phase = "approach"
 				bird_timer = BIRD_APPROACH
 				bird_entry_side = _random_sign()
 				bird_dir = _random_sign()
-				bird_dirs = [_random_sign(), bird_dir, _random_sign()]
-				if bird_dirs[0] == bird_dir and bird_dirs[2] == bird_dir:
-					bird_dirs[_rng.randi_range(0, 1) * 2] = -bird_dir
+				bird_dirs = [-bird_dir, bird_dir, -bird_dir]
+				bird_response = 0
 				events.append({"type": "birds", "entry_side": bird_entry_side})
 			elif bird_phase == "approach" and bird_timer <= 0.0:
 				bird_phase = "warn"
 				bird_timer = BIRD_WARN
 				events.append({"type": "birds_arrived", "dir": bird_dir})
-			elif bird_phase == "warn" and bird_timer <= 0.0:
-				bird_phase = "rest"
-				if bird_check(tilt, bird_dir):
+			elif bird_phase == "warn":
+				if bird_response == 0 and absf(lean) > 0.5:
+					bird_response = 1 if lean > 0.0 else -1
+				if bird_timer <= 0.0:
+					bird_phase = "rest"
 					bird_timer = BIRD_REST
-					events.append({"type": "birds_pass"})
-				else:
-					_fall("birds", events, -bird_dir)
-					return events
+					bird_gust_timer = BIRD_GUST_DURATION
+					stage_push -= bird_dir * BIRD_GUST_PUSH
+					tilt_vel -= bird_dir * BIRD_GUST_IMPULSE
+					var survived := bird_check(bird_response, bird_dir)
+					if survived:
+						events.append({"type": "birds_pass"})
+					events.append({"type": "bird_gust", "dir": -bird_dir})
+					if not survived:
+						_fall("birds", events, -bird_dir)
+						return events
 		"Tension":
 			tension += dt * TENSION_RATE
 			stage_push += sin(time * 11.0) * tension * TENSION_JITTER
@@ -245,6 +259,8 @@ func _reset_stage() -> void:
 	bird_dir = 1
 	bird_dirs = [1, 1, 1]
 	bird_entry_side = 1
+	bird_response = 0
+	bird_gust_timer = 0.0
 	tension = 0.0
 	sway = 0.0
 	push = 0.0

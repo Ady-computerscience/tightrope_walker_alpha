@@ -80,6 +80,18 @@ func _process(_delta: float) -> bool:
 			printerr("FAIL: bird model remained visible after the warning")
 			quit(1)
 			return true
+	game.set("visual_z", Rules.step_z(2, 1))
+	bird_rules.tilt = -0.25
+	game.call("_update_walker", 0.0)
+	var loaded_rope: Dictionary = Rules.rope_at(game.get("visual_z"))
+	var rope_point: Vector3 = game.call("_rope_point", 2, loaded_rope["progress"], loaded_rope)
+	if game.get("walker").position.x >= 0.0 or rope_point.x >= 0.0:
+		printerr("FAIL: opposite-direction gust would move the walker or rope the wrong way")
+		quit(1)
+		return true
+	game.set("visual_z", Rules.step_z(1, 0))
+	bird_rules.tilt = 0.0
+	game.call("_update_walker", 0.0)
 	bird_rules.tower = 1
 	if not _has_key_action("step_left", KEY_W) or not _has_key_action("step_right", KEY_O) or not _has_key_action("lean_left", KEY_Q) or not _has_key_action("lean_right", KEY_P):
 		printerr("FAIL: W/O step or Q/P lean bindings are missing")

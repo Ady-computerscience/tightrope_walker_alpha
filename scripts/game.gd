@@ -114,6 +114,7 @@ func _process(delta: float) -> void:
 					"birds": hud.show_toast("Birds incoming!")
 					"birds_arrived": hud.show_toast("Lean toward the middle bird")
 					"birds_pass": hud.show_toast("Birds passed")
+					"bird_gust": hud.show_toast("Bird gust! Keep your balance")
 					"gust": hud.show_toast("Wind changes direction")
 					"fall":
 						fall_elapsed = 0.0
@@ -247,7 +248,7 @@ func _update_walker(_dt: float) -> void:
 		var sag := STATIC_SAG * 4.0 * s * (1.0 - s)
 		var load_sag := LOAD_SAG * 4.0 * s * (1.0 - s) * (1.0 - 0.55 * rules.tension)
 		feet.y -= sag + load_sag
-		feet.x = -rules.tilt * 0.35
+		feet.x = rules.tilt * 0.35
 		if rules.stage_kind() == "Sway":
 			feet.x += rules.sway * 1.6 * sin(PI * s)
 	if rules.state == "falling":
@@ -306,7 +307,7 @@ func _rope_point(tower_number: int, s: float, current: Dictionary) -> Vector3:
 		var load: float = current["progress"]
 		var triangle := s / load if s <= load and load > 0.0 else ((1.0 - s) / (1.0 - load) if s > load and load < 1.0 else 0.0)
 		y -= LOAD_SAG * 4.0 * load * (1.0 - load) * triangle * (1.0 - 0.55 * rules.tension)
-		x -= rules.tilt * 0.35 * triangle
+		x += rules.tilt * 0.35 * triangle
 	return Vector3(x, y, Rules.tower_z(tower_number) - Rules.ROPE_START_OFFSET - s * Rules.ROPE_LENGTH)
 
 
@@ -343,7 +344,7 @@ func _update_hud() -> void:
 	var cue := "Keep the pole level"
 	match rules.stage_kind():
 		"Wind": cue = "Wind: %s  %.0f%%" % ["RIGHT" if rules.wind_dir > 0 else "LEFT", rules.wind_ramp * 100.0]
-		"Birds": cue = "Birds: lean %s" % ["RIGHT" if rules.bird_dir > 0 else "LEFT"] if rules.bird_phase == "warn" else ("Birds incoming" if rules.bird_phase == "approach" else "Watch for the birds")
+		"Birds": cue = "Center bird: Q / P  %.1fs" % rules.bird_timer if rules.bird_phase == "warn" else ("Bird gust!" if rules.bird_gust_timer > 0.0 else ("Birds incoming" if rules.bird_phase == "approach" else "Watch for the birds"))
 		"Tension": cue = "Tension: %.0f%%  •  Space to release" % [rules.tension * 100.0]
 		"Sway": cue = "Sway: %.0f%%  •  Step near center" % [rules.sway * 100.0]
 	hud.show_status(rules.tower, rules.step, Rules.STEPS_PER_TOWER, rules.stage_kind(), rules.tilt, cue)
