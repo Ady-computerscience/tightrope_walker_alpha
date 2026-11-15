@@ -7,6 +7,7 @@ var failures: Array[String] = []
 
 func _initialize() -> void:
 	_test_path()
+	_test_safe_checkpoints()
 	_test_steps_and_checkpoints()
 	_test_checkpoint_respawn()
 	_test_wind_disabled()
@@ -39,10 +40,35 @@ func _test_path() -> void:
 			_check(Rules.rope_at(Rules.step_z(tower, step)).get("tower", -1) == tower, "tower %d step %d is on rope" % [tower, step])
 
 
+func _test_safe_checkpoints() -> void:
+	for tower_number in range(1, Rules.TOWER_COUNT + 1):
+		var run := Rules.new(100 + tower_number)
+		run.tower = tower_number
+		run.tilt = 0.99
+		run.tilt_vel = 2.0
+		run.bird_timer = 0.0
+		run.tension = 0.99
+		var events := run.update(0.1, 1.0)
+		_check(events.is_empty() and run.state == "walking" and not run.on_rope and is_zero_approx(run.tilt) and is_zero_approx(run.stage_time), "tower %d checkpoint ignores balance and interruptions" % tower_number)
+		_check(run.try_step() == "ok" and run.step == 1 and not run.on_rope, "tower %d first step begins from rooftop" % tower_number)
+		for tick in 4:
+			events = run.update(0.1, 1.0)
+			_check(events.is_empty() and run.state == "walking" and is_zero_approx(run.stage_time), "tower %d first step stays safe until it reaches the rope" % tower_number)
+		run.tension = 0.0
+		run.reach_rope()
+		run.update(1.0 / 60.0, 0.0)
+		_check(run.on_rope and run.stage_time > 0.0, "tower %d activates rules after reaching the rope" % tower_number)
+
+
 func _test_steps_and_checkpoints() -> void:
 	var run := Rules.new(1)
+	_check(not run.on_rope, "start tower begins off the rope")
 	_check(run.try_step() == "ok", "first press steps")
 	_check(run.try_step() == "cooldown" and run.step == 1, "rapid second press is ignored")
+	run.time += 0.5
+	_check(run.try_step() == "blocked" and not run.on_rope, "second step waits for the first step to reach the rope")
+	run.reach_rope()
+	_check(run.on_rope, "first completed step activates balance")
 	for index in 8:
 		run.time += 0.5
 		run.tilt = 0.0
@@ -51,38 +77,43 @@ func _test_steps_and_checkpoints() -> void:
 			_check(result == "tower" and run.tower == 2 and run.step == 0, "nine steps reach tower two")
 	run.tower = 3
 	run.checkpoint_tower = 3
+	run.time += 0.5
+	_check(run.try_step() == "ok", "checkpoint first step begins")
+	run.reach_rope()
 	run.tilt = 0.99
 	run.tilt_vel = 2.0
 	var events := run.update(1.0 / 60.0, 0.0)
 	_check(run.state == "falling" and events.back().get("type") == "fall", "balance fall fires event")
 	run.respawn()
-	_check(run.state == "walking" and run.tower == 3 and run.step == 0, "fall restarts same tower")
+	_check(run.state == "walking" and run.tower == 3 and run.step == 0 and not run.on_rope, "fall restarts safely on same tower")
 
 
 func _test_checkpoint_respawn() -> void:
 	var run := Rules.new(13)
 	for reached in range(1, Rules.TOWER_COUNT + 1):
-		_check(run.tower == reached and run.checkpoint_tower == reached, "tower %d is the active checkpoint" % reached)
-		run.try_step()
+		_check(run.tower == reached and run.checkpoint_tower == reached and not run.on_rope, "tower %d is a safe checkpoint" % reached)
+		run.time += 0.5
+		_check(run.try_step() == "ok", "tower %d first step begins" % reached)
+		run.reach_rope()
 		_force_balance_fall(run)
 		run.respawn()
-		_check(run.tower == reached and run.step == 0, "fall before next tower respawns at tower %d" % reached)
+		_check(run.tower == reached and run.step == 0 and not run.on_rope, "fall before next tower respawns safely at tower %d" % reached)
 		if reached == Rules.TOWER_COUNT:
 			break
-		for attempt in 2:
-			for step_number in Rules.STEPS_PER_TOWER:
-				run.time += 0.5
-				var result := run.try_step()
-				if step_number == Rules.STEPS_PER_TOWER - 1:
-					_check(result == "tower" and run.tower == reached + 1, "tower %d transition begins" % reached)
-			if attempt == 0:
-				_check(run.checkpoint_tower == reached, "checkpoint waits for landing on tower %d" % (reached + 1))
-				_force_balance_fall(run)
-				run.respawn()
-				_check(run.tower == reached, "fall during landing returns to tower %d" % reached)
-			else:
-				run.reach_tower()
-				_check(run.checkpoint_tower == reached + 1, "landing saves tower %d checkpoint" % (reached + 1))
+		for step_number in Rules.STEPS_PER_TOWER:
+			run.time += 0.5
+			var result := run.try_step()
+			if step_number == 0:
+				_check(not run.on_rope, "tower %d first step is safe until landing on rope" % reached)
+				run.reach_rope()
+			if step_number == Rules.STEPS_PER_TOWER - 1:
+				_check(result == "tower" and run.tower == reached + 1 and not run.on_rope, "tower %d landing begins safely" % reached)
+		_check(run.checkpoint_tower == reached, "checkpoint waits for landing on tower %d" % (reached + 1))
+		run.tilt = 0.99
+		run.tilt_vel = 2.0
+		_check(run.update(1.0 / 60.0, 0.0).is_empty() and run.state == "walking" and is_zero_approx(run.tilt), "balance cannot fail during tower landing")
+		run.reach_tower()
+		_check(run.checkpoint_tower == reached + 1, "landing saves tower %d checkpoint" % (reached + 1))
 
 
 func _force_balance_fall(run: TightropeRules) -> void:
@@ -92,20 +123,29 @@ func _force_balance_fall(run: TightropeRules) -> void:
 	_check(run.state == "falling" and events.back().get("type") == "fall", "balance fall triggers for checkpoint test")
 
 
+func _enter_rope(run: TightropeRules) -> void:
+	_check(run.try_step() == "ok", "first step onto rope begins")
+	run.reach_rope()
+	_check(run.on_rope, "first step onto rope completes")
+
+
 func _test_wind_disabled() -> void:
 	var run := Rules.new(8)
 	_check(run.stage_kind() == "Balance", "tower one uses balance while wind is disabled")
+	_enter_rope(run)
 	for tick in 120:
 		for event in run.update(0.1, 0.0):
 			_check(event["type"] != "gust", "disabled wind emitted a gust at tick %d" % tick)
 		if run.state == "falling":
 			run.respawn()
+			_enter_rope(run)
 		_check(is_zero_approx(run.wind_ramp) and is_equal_approx(run.wind_timer, 0.6), "disabled wind changed its timer or ramp at tick %d" % tick)
 
 
 func _test_birds() -> void:
 	var run := Rules.new(4)
 	run.tower = 2
+	_enter_rope(run)
 	run.bird_timer = 0.0
 	var events := run.update(1.0 / 60.0, 0.0)
 	_check(events.size() == 1 and events[0]["type"] == "birds" and run.bird_phase == "approach", "birds approach before warning")
@@ -126,6 +166,7 @@ func _test_birds() -> void:
 	_check(run.tilt_vel * run.bird_dir < 0.0, "bird gust pushes opposite the center bird")
 	var correct := Rules.new(5)
 	correct.tower = 2
+	_enter_rope(correct)
 	correct.bird_phase = "warn"
 	correct.bird_timer = Rules.BIRD_WARN
 	correct.bird_dir = 1
@@ -138,6 +179,7 @@ func _test_birds() -> void:
 	_check(events.any(func(event: Dictionary) -> bool: return event["type"] == "birds_pass") and events.any(func(event: Dictionary) -> bool: return event["type"] == "bird_gust" and event["dir"] == -1), "success emits pass and gust events")
 	var last_frame := Rules.new(7)
 	last_frame.tower = 2
+	_enter_rope(last_frame)
 	last_frame.bird_phase = "warn"
 	last_frame.bird_timer = 0.01
 	last_frame.bird_dir = -1
@@ -147,6 +189,7 @@ func _test_birds() -> void:
 	_check(correct.push < 0.0 and correct.bird_gust_timer < Rules.BIRD_GUST_DURATION, "bird gust continues briefly after countdown")
 	var idle := Rules.new(6)
 	idle.tower = 2
+	_enter_rope(idle)
 	idle.bird_phase = "warn"
 	idle.bird_timer = 0.0
 	idle.update(1.0 / 60.0, 0.0)
@@ -157,6 +200,7 @@ func _test_birds() -> void:
 	for seed_value in range(1, 101):
 		var flock := Rules.new(seed_value)
 		flock.tower = 2
+		_enter_rope(flock)
 		flock.bird_timer = 0.0
 		flock.update(1.0 / 60.0, 0.0)
 		saw_left = saw_left or flock.bird_entry_side == -1
@@ -172,6 +216,8 @@ func _test_birds() -> void:
 func _test_tension() -> void:
 	var run := Rules.new(5)
 	run.tower = 3
+	_check(run.release() == "none", "tension cannot be released on checkpoint")
+	_enter_rope(run)
 	run.tension = 0.7
 	_check(run.release() == "released" and run.tension == 0.0, "release resets tension")
 	_check(run.release() == "cooldown", "release has cooldown")
@@ -184,16 +230,23 @@ func _test_sway() -> void:
 	var run := Rules.new(6)
 	run.tower = 4
 	run.sway = 0.9
-	_check(run.try_step() == "shove" and run.step == 1, "unsafe sway shoves but still advances")
+	_check(run.try_step() == "ok" and run.step == 1, "first step is safe from sway")
+	run.reach_rope()
+	run.time += 0.5
+	_check(run.try_step() == "shove" and run.step == 2, "unsafe sway shoves after entering rope")
 	var safe := Rules.new(6)
 	safe.tower = 4
 	safe.sway = 0.05
+	_enter_rope(safe)
+	safe.time += 0.5
 	_check(safe.try_step() == "ok", "safe sway allows step")
 
 
 func _test_determinism() -> void:
 	var first := Rules.new(42)
 	var second := Rules.new(42)
+	_enter_rope(first)
+	_enter_rope(second)
 	for tick in 180:
 		var lean := sin(float(tick) * 0.12)
 		first.update(1.0 / 60.0, lean)
@@ -225,6 +278,8 @@ func _test_full_run(seed_value: int) -> void:
 			var result := run.try_step()
 			if result != "cooldown":
 				since_step = 0.0
+			if run.step == 1 and not run.on_rope:
+				run.reach_rope()
 			if result == "tower":
 				run.reach_tower()
 			if result == "won":

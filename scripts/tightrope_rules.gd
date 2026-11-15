@@ -36,6 +36,7 @@ const BIRD_PATTERNS := [[-1, -1, -1], [1, 1, 1], [-1, 1, -1], [1, -1, 1]]
 var tower := 1
 var checkpoint_tower := 1
 var step := 0
+var on_rope := false
 var state := "walking"
 var time := 0.0
 var stage_time := 0.0
@@ -115,6 +116,12 @@ func update(delta: float, lean: float) -> Array[Dictionary]:
 		return events
 	var dt := minf(delta, 0.1)
 	time += dt
+	if not on_rope:
+		tilt = 0.0
+		tilt_vel = 0.0
+		lean_smooth = 0.0
+		push = 0.0
+		return events
 	stage_time += dt
 	var stage_push := sin(time * 1.7) * WOBBLE + sin(time * 3.1 + 1.0) * WOBBLE * 0.45
 	match stage_kind():
@@ -187,14 +194,17 @@ func try_step() -> String:
 		return "blocked"
 	if time - last_step_at < STEP_COOLDOWN:
 		return "cooldown"
+	if step > 0 and not on_rope:
+		return "blocked"
 	last_step_at = time
 	var result := "ok"
-	if stage_kind() == "Tension":
+	if on_rope and stage_kind() == "Tension":
 		tension = minf(0.99, tension + TENSION_PER_STEP)
-	elif stage_kind() == "Sway" and not sway_safe(sway):
+	elif on_rope and stage_kind() == "Sway" and not sway_safe(sway):
 		tilt_vel += (1 if sway >= 0.0 else -1) * SWAY_SHOVE
 		result = "shove"
-	tilt_vel += _rng.randf_range(-0.3, 0.3)
+	if on_rope:
+		tilt_vel += _rng.randf_range(-0.3, 0.3)
 	step += 1
 	if step >= STEPS_PER_TOWER:
 		if tower >= TOWER_COUNT:
@@ -210,7 +220,7 @@ func try_step() -> String:
 
 
 func release() -> String:
-	if state != "walking" or stage_kind() != "Tension":
+	if state != "walking" or not on_rope or stage_kind() != "Tension":
 		return "none"
 	if time - last_release_at < RELEASE_COOLDOWN:
 		return "cooldown"
@@ -233,6 +243,11 @@ func reach_tower() -> void:
 		checkpoint_tower = tower
 
 
+func reach_rope() -> void:
+	if state == "walking" and step == 1:
+		on_rope = true
+
+
 func _fall(reason: String, events: Array[Dictionary], direction: int = 0) -> void:
 	state = "falling"
 	falls += 1
@@ -247,6 +262,7 @@ func _random_sign() -> int:
 
 func _reset_stage() -> void:
 	step = 0
+	on_rope = false
 	tilt = 0.0
 	tilt_vel = 0.0
 	lean_smooth = 0.0

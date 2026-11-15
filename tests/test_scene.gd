@@ -20,6 +20,10 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: game scene did not initialize")
 		quit(1)
 		return true
+	if game.get("rules").on_rope or not Rules.rope_at(game.get("visual_z")).is_empty():
+		printerr("FAIL: stuntman did not start safely on the rooftop")
+		quit(1)
+		return true
 	var bird_models: Array = game.get("birds")
 	if bird_models.size() != 3:
 		printerr("FAIL: three bird models were not created")
@@ -139,8 +143,20 @@ func _process(_delta: float) -> bool:
 		return true
 	startup_rules.last_step_at = -10.0
 	game.call("_step", "left")
-	if not game.get("has_taken_first_step") or startup_rules.step != 1:
+	if not game.get("has_taken_first_step") or startup_rules.step != 1 or startup_rules.on_rope:
 		printerr("FAIL: first successful step did not start control hint countdown")
+		quit(1)
+		return true
+	game.call("_update_step", 0.2)
+	startup_rules.tilt = 0.99
+	startup_rules.tilt_vel = 2.0
+	if not startup_rules.update(1.0 / 60.0, 1.0).is_empty() or startup_rules.state != "walking" or startup_rules.on_rope or not is_zero_approx(startup_rules.tilt):
+		printerr("FAIL: balance registered before the first step reached the rope")
+		quit(1)
+		return true
+	game.call("_update_step", 0.2)
+	if not startup_rules.on_rope or not is_equal_approx(game.get("visual_z"), Rules.step_z(1, 1)):
+		printerr("FAIL: first step did not put the stuntman on the rope")
 		quit(1)
 		return true
 	hud.call("_process", 9.9)
@@ -210,7 +226,11 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: left foot step did not advance rules")
 		quit(1)
 		return true
-	game.set("step_duration", 0.0)
+	game.call("_update_step", 1.0)
+	if not game.get("rules").on_rope:
+		printerr("FAIL: first step did not activate rope balance after restart")
+		quit(1)
+		return true
 	game.get("rules").time += 0.5
 	game.call("_step", "right")
 	if game.get("rules").step != 2 or game.get("last_step_foot") != "right" or game.get("walker_animation").current_animation_position < 0.25:
@@ -230,6 +250,8 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	var run: TightropeRules = game.get("rules")
+	run.step = 1
+	run.reach_rope()
 	run.step = Rules.STEPS_PER_TOWER - 1
 	game.call("_step", "left")
 	if run.tower != 2 or run.checkpoint_tower != 1:
@@ -242,8 +264,25 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	game.call("_update_step", 1.0)
-	if run.checkpoint_tower != 2:
+	if run.checkpoint_tower != 2 or run.on_rope:
 		printerr("FAIL: landing did not save tower two checkpoint")
+		quit(1)
+		return true
+	run.tilt = 0.99
+	run.tilt_vel = 2.0
+	if not run.update(1.0 / 60.0, 0.0).is_empty() or run.state != "walking" or not is_zero_approx(run.tilt):
+		printerr("FAIL: balance registered on tower two checkpoint")
+		quit(1)
+		return true
+	run.time += 0.5
+	game.call("_step", "left")
+	if run.step != 1 or run.on_rope:
+		printerr("FAIL: tower two first step was not safe until reaching the rope")
+		quit(1)
+		return true
+	game.call("_update_step", 1.0)
+	if not run.on_rope:
+		printerr("FAIL: tower two first step did not activate balance")
 		quit(1)
 		return true
 	run.tilt = 0.99
@@ -255,7 +294,7 @@ func _process(_delta: float) -> bool:
 		return true
 	for tick in 18:
 		game.call("_process", 0.1)
-	if run.state != "walking" or run.tower != 2 or not is_equal_approx(game.get("visual_z"), Rules.step_z(2, 0)):
+	if run.state != "walking" or run.tower != 2 or run.on_rope or not is_equal_approx(game.get("visual_z"), Rules.step_z(2, 0)):
 		printerr("FAIL: fall did not respawn on last reached rooftop: state=%s tower=%d z=%f elapsed=%f" % [run.state, run.tower, game.get("visual_z"), game.get("fall_elapsed")])
 		quit(1)
 		return true
