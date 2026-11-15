@@ -10,6 +10,7 @@ const CREAM := Color("fff4e4")
 const GOLD := Color("ffca62")
 const CORAL := Color("ff6a58")
 const WARNING_RED := Color("ff3b3b")
+const WireGaugeScene := preload("res://scripts/wire_tension_gauge.gd")
 const MINT := Color("7ee8ac")
 const PANEL := Color("211e36e8")
 const MUTED := Color("b7b5c9")
@@ -23,6 +24,8 @@ var _progress: Label
 var _stage: Label
 var _cue: Label
 var _balance: ProgressBar
+var _wire_gauge: WireTensionGauge
+var _wire_gauge_panel: PanelContainer
 var _countdown_track: Panel
 var _countdown_fill: Panel
 var _countdown_fill_style: StyleBoxFlat
@@ -62,10 +65,12 @@ func start_control_hint_countdown() -> void:
 	_control_hint_elapsed = 0.0
 
 
-func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, cue: String) -> void:
+func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, cue: String, tension: float = 0.0) -> void:
 	_progress.text = "TOWER %02d / 04     STEP %02d / %02d" % [tower, step, steps]
 	_stage.text = kind.to_upper()
 	_cue.text = cue
+	_wire_gauge_panel.visible = kind == "Tension"
+	_wire_gauge.set_tension(tension)
 	_balance.value = clampf((tilt + 1.0) * 50.0, 0.0, 100.0)
 	var fill := _balance.get_theme_stylebox("fill") as StyleBoxFlat
 	fill.bg_color = CORAL if absf(tilt) >= 0.7 else GOLD
@@ -187,6 +192,21 @@ func _build() -> void:
 	_cue = _label("Keep the pole level", 13, MINT)
 	_cue.clip_text = true
 	top_box.add_child(_cue)
+
+	var gauge_panel := PanelContainer.new()
+	gauge_panel.name = "Wire Tension Gauge"
+	gauge_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	gauge_panel.offset_left = -226.0
+	gauge_panel.offset_right = -TOP_BANNER_SIDE_MARGIN
+	gauge_panel.offset_top = TOP_BANNER_TOP_MARGIN
+	gauge_panel.offset_bottom = 166.0
+	gauge_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	gauge_panel.add_theme_stylebox_override("panel", _panel_style(8))
+	root.add_child(gauge_panel)
+	_wire_gauge_panel = gauge_panel
+	_wire_gauge = WireGaugeScene.new() as WireTensionGauge
+	gauge_panel.add_child(_wire_gauge)
+	gauge_panel.hide()
 
 	_countdown_track = Panel.new()
 	_countdown_track.name = "Reaction Countdown"

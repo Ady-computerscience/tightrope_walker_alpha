@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#BFFCFF"/>
+      <stop offset="50%" stop-color="#22D3EE"/>
+      <stop offset="100%" stop-color="#0A5566"/>
+    </linearGradient>
+  </defs>
+  <!-- Border arc -->
+  <path fill="url(#bd)" d="M16,128 A112,112 0 0 1 240,128 A14,14 0 0 1 212,128 A84,84 0 0 0 44,128 A14,14 0 0 1 16,128 Z"/>
+  <!-- Track arc -->
+  <path fill="#0C2A30" d="M20,128 A108,108 0 0 1 236,128 A10,10 0 0 1 216,128 A88,88 0 0 0 40,128 A10,10 0 0 1 20,128 Z"/>
+</svg>

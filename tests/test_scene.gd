@@ -249,6 +249,23 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	var hud: GameHUD = game.get("hud")
+	var wire_gauge: WireTensionGauge = hud.get("_wire_gauge")
+	var wire_gauge_panel: PanelContainer = hud.get("_wire_gauge_panel")
+	if wire_gauge == null or wire_gauge_panel == null or wire_gauge_panel.visible:
+		printerr("FAIL: wire tension gauge is missing or visible before its stage")
+		quit(1)
+		return true
+	hud.show_status(3, 1, Rules.STEPS_PER_TOWER, "Tension", 0.0, "Release tension", 0.9)
+	wire_gauge.call("_process", 0.25)
+	if not wire_gauge_panel.visible or not is_equal_approx(wire_gauge.tension, 0.9) or wire_gauge.displayed_tension <= 0.0:
+		printerr("FAIL: wire tension gauge did not reveal and move its needle")
+		quit(1)
+		return true
+	hud.show_status(1, 0, Rules.STEPS_PER_TOWER, "Wind", 0.0, "Keep the pole level")
+	if wire_gauge_panel.visible:
+		printerr("FAIL: wire tension gauge stayed visible outside the tension stage")
+		quit(1)
+		return true
 	var hint: PanelContainer = hud.get("_control_hint")
 	if hint == null or not hint.visible or not is_equal_approx(hint.anchor_top, 1.0):
 		printerr("FAIL: control hint is not visible at the bottom on startup")
@@ -780,6 +797,22 @@ func _process(_delta: float) -> bool:
 	var win_text: Label = hud.get("_win_text")
 	if not win_text.text.contains("Time: 25.0 s") or not win_text.text.contains("Falls: 1") or win_text.text.contains("Gust"):
 		printerr("FAIL: win card contains gust result text or omits time and falls")
+		quit(1)
+		return true
+	game.set("mode", "walking")
+	run.tower = 3
+	run.on_rope = true
+	run.tension = 0.8
+	game.call("_release")
+	var toast: Label = hud.get("_toast")
+	if toast.text != "PASS" or not is_zero_approx(run.tension):
+		printerr("FAIL: releasing wire tension did not show PASS")
+		quit(1)
+		return true
+	run.tension = 0.995
+	game.call("_process", 0.1)
+	if run.fall_reason != "snap" or toast.text != "FAIL":
+		printerr("FAIL: snapped wire tension did not show FAIL")
 		quit(1)
 		return true
 	print("PASS: main scene initializes and step action works")

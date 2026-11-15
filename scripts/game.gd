@@ -215,7 +215,7 @@ func _process(delta: float) -> void:
 					"fall":
 						_start_fall()
 						step_duration = 0.0
-						hud.show_toast("MISS", 1.0)
+						hud.show_toast("FAIL" if event["reason"] == "snap" else "MISS", 1.0)
 						if walker_animation != null:
 							walker_animation.stop()
 		if rules.state == "falling":
@@ -291,7 +291,7 @@ func _step(foot: String = "") -> void:
 
 func _release() -> void:
 	if mode == "walking" and not paused and rules.release() == "released":
-		hud.show_toast("Tension released")
+		hud.show_toast("PASS", 1.0)
 
 
 func _start_intro_skip() -> void:
@@ -640,7 +640,7 @@ func _update_hud() -> void:
 			"Birds": cue = "Center bird: Q / P  %.1fs" % rules.bird_timer if rules.bird_phase == "warn" else ("Bird gust!" if rules.bird_gust_timer > 0.0 else ("Birds incoming" if rules.bird_phase == "approach" else "Watch for the birds"))
 			"Tension": cue = "Tension: %.0f%%  •  Space to release" % [rules.tension * 100.0]
 			"Sway": cue = "Sway: %.0f%%  •  Step near center" % [rules.sway * 100.0]
-	hud.show_status(rules.tower, rules.step, Rules.STEPS_PER_TOWER, rules.stage_kind(), rules.tilt, cue)
+	hud.show_status(rules.tower, rules.step, Rules.STEPS_PER_TOWER, rules.stage_kind(), rules.tilt, cue, rules.tension)
 
 
 func _announce_tower(subtitle: String = "") -> void:

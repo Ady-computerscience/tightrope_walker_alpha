@@ -12,6 +12,8 @@ The first rope section introduces Gust Warning. A flag appears on the side the g
 
 The four crossings move from blue daylight to orange and pink sunset, purple dusk, and night. The sun descends during the first crossing and sets during the second; the moon rises through the third and fourth. Sky colors, city lighting, fog, and the dark overlay blend when a new stage begins.
 
+The wire tension stage shows a corner gauge with green, yellow, and red ranges. Its needle follows the current tension and drops when the player releases the wire. The gauge uses a [CC0 semicircular HUD asset](https://freegameui.net/assets/gauges/gauge_arc-half_cyber-cyan_01/) as its base.
+
 ## Tests
 
 Run the import once on a fresh checkout, then run the tests:
