@@ -12,6 +12,7 @@ func _initialize() -> void:
 	_test_checkpoint_respawn()
 	_test_gust_warning()
 	_test_birds()
+	_test_interruption_safe_period()
 	_test_tension()
 	_test_sway()
 	_test_determinism()
@@ -285,6 +286,59 @@ func _test_birds() -> void:
 	_check(seen_patterns.size() == 4 and seen_patterns.has([-1, -1, -1]) and seen_patterns.has([1, 1, 1]) and seen_patterns.has([-1, 1, -1]) and seen_patterns.has([1, -1, 1]), "all congruent and incongruent bird conditions occur")
 	_check(Rules.bird_check(1, 1) and Rules.bird_check(-1, -1), "correct bird lean passes")
 	_check(not Rules.bird_check(0, 1) and not Rules.bird_check(-1, 1), "missing or wrong bird lean fails")
+
+
+func _test_interruption_safe_period() -> void:
+	var after_wind := Rules.new(14)
+	after_wind.tower = 2
+	_enter_rope(after_wind)
+	after_wind.wind_phase = "blow"
+	after_wind.wind_timer = 0.01
+	after_wind.bird_timer = 0.0
+	after_wind.update(1.0 / 60.0, 0.0)
+	_check(after_wind.wind_phase == "rest" and after_wind.bird_phase == "rest" and is_equal_approx(after_wind.interruption_safe_timer, Rules.INTERRUPTION_SAFE_PERIOD), "wind blow starts safe period before birds can approach")
+	for frame in 59:
+		after_wind.update(1.0 / 60.0, 0.0)
+	_check(after_wind.bird_phase == "rest" and after_wind.interruption_safe_timer > 0.0, "birds wait throughout safe period after wind")
+	after_wind.update(1.0 / 60.0, 0.0)
+	after_wind.update(1.0 / 60.0, 0.0)
+	_check(after_wind.bird_phase == "approach", "birds may approach after safe period expires")
+
+	var after_birds := Rules.new(15)
+	after_birds.tower = 2
+	_enter_rope(after_birds)
+	after_birds.bird_gust_timer = 0.01
+	after_birds.bird_timer = 100.0
+	after_birds.wind_timer = 0.0
+	after_birds.update(1.0 / 60.0, 0.0)
+	_check(after_birds.wind_phase == "rest" and is_equal_approx(after_birds.interruption_safe_timer, Rules.INTERRUPTION_SAFE_PERIOD), "bird gust starts safe period before wind can cue")
+	for frame in 59:
+		after_birds.update(1.0 / 60.0, 0.0)
+	_check(after_birds.wind_phase == "rest" and after_birds.interruption_safe_timer > 0.0, "wind waits throughout safe period after birds")
+	after_birds.update(1.0 / 60.0, 0.0)
+	after_birds.update(1.0 / 60.0, 0.0)
+	_check(after_birds.wind_phase == "cue", "wind may cue after safe period expires")
+
+	var tower_two := Rules.new(16)
+	tower_two.tower = 2
+	_enter_rope(tower_two)
+	var saw_birds := false
+	var saw_flag := false
+	for frame in 60 * 7:
+		tower_two.tilt = 0.0
+		tower_two.tilt_vel = 0.0
+		var lean := float(tower_two.bird_dir) if tower_two.bird_phase == "warn" else 0.0
+		var response := -tower_two.wind_flag_side if tower_two.wind_phase == "react" else 0
+		var events := tower_two.update(1.0 / 60.0, lean, response)
+		for event in events:
+			if event["type"] == "birds":
+				saw_birds = true
+			elif event["type"] == "gust_cue":
+				saw_flag = true
+				_check(tower_two.bird_phase == "rest" and tower_two.bird_gust_timer <= 0.0 and tower_two.interruption_safe_timer <= 0.0, "tower two flag starts only after birds and safe period")
+		if saw_flag or tower_two.state != "walking":
+			break
+	_check(saw_birds and saw_flag and tower_two.state == "walking", "tower two shows both bird and flag interruptions")
 
 
 func _test_tension() -> void:

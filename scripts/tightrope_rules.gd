@@ -26,6 +26,7 @@ const BIRD_REST := 1.6
 const BIRD_GUST_DURATION := 0.35
 const BIRD_GUST_PUSH := 1.1
 const BIRD_GUST_IMPULSE := 1.2
+const INTERRUPTION_SAFE_PERIOD := 1.0
 const TENSION_RATE := 0.11
 const TENSION_PER_STEP := 0.07
 const TENSION_JITTER := 0.8
@@ -68,6 +69,7 @@ var bird_dirs := [1, 1, 1]
 var bird_entry_side := 1
 var bird_response := 0
 var bird_gust_timer := 0.0
+var interruption_safe_timer := 0.0
 var tension := 0.0
 var sway := 0.0
 var push := 0.0
@@ -130,6 +132,7 @@ func update(delta: float, lean: float, gust_response: int = 0) -> Array[Dictiona
 		push = 0.0
 		return events
 	stage_time += dt
+	interruption_safe_timer = maxf(0.0, interruption_safe_timer - dt)
 	var stage_push := sin(time * 1.7) * WOBBLE + sin(time * 3.1 + 1.0) * WOBBLE * 0.45
 	if WIND_ENABLED:
 		stage_push += _update_wind(dt, gust_response, events)
@@ -138,9 +141,11 @@ func update(delta: float, lean: float, gust_response: int = 0) -> Array[Dictiona
 			if bird_gust_timer > 0.0:
 				bird_gust_timer = maxf(0.0, bird_gust_timer - dt)
 				stage_push -= bird_dir * BIRD_GUST_PUSH
+				if bird_gust_timer <= 0.0:
+					interruption_safe_timer = INTERRUPTION_SAFE_PERIOD
 			var bird_had_time := bird_timer > 0.0
 			bird_timer -= dt
-			if bird_phase == "rest" and bird_timer <= 0.0 and wind_phase == "rest":
+			if bird_phase == "rest" and bird_timer <= 0.0 and wind_phase == "rest" and interruption_safe_timer <= 0.0:
 				bird_phase = "approach"
 				bird_timer = BIRD_APPROACH
 				bird_entry_side = _random_sign()
@@ -193,9 +198,9 @@ func _update_wind(dt: float, response: int, events: Array[Dictionary]) -> float:
 	var gust_push := 0.0
 	var had_time := wind_timer > 0.0
 	if wind_phase == "rest":
-		if stage_kind() == "Birds" and bird_phase != "rest":
-			return 0.0
 		wind_timer -= dt
+		if interruption_safe_timer > 0.0 or (stage_kind() == "Birds" and (bird_phase != "rest" or bird_gust_timer > 0.0)):
+			return 0.0
 		if wind_timer <= 0.0:
 			wind_dir = _random_sign()
 			wind_flag_side = -wind_dir
@@ -235,6 +240,7 @@ func _update_wind(dt: float, response: int, events: Array[Dictionary]) -> float:
 			wind_phase = "rest"
 			wind_timer = _rng.randf_range(3.2, 4.6)
 			wind_ramp = 0.0
+			interruption_safe_timer = INTERRUPTION_SAFE_PERIOD
 	return gust_push
 
 
@@ -331,6 +337,7 @@ func _reset_stage() -> void:
 	bird_entry_side = 1
 	bird_response = 0
 	bird_gust_timer = 0.0
+	interruption_safe_timer = 0.0
 	tension = 0.0
 	sway = 0.0
 	push = 0.0
