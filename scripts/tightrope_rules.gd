@@ -31,6 +31,7 @@ const SWAY_PUSH := 0.55
 const SWAY_WINDOW := 0.35
 const SWAY_SHOVE := 1.4
 const STAGES := ["Wind", "Birds", "Tension", "Sway"]
+const BIRD_PATTERNS := [[-1, -1, -1], [1, 1, 1], [-1, 1, -1], [1, -1, 1]]
 
 var tower := 1
 var checkpoint_tower := 1
@@ -135,8 +136,8 @@ func update(delta: float, lean: float) -> Array[Dictionary]:
 				bird_phase = "approach"
 				bird_timer = BIRD_APPROACH
 				bird_entry_side = _random_sign()
-				bird_dir = _random_sign()
-				bird_dirs = [-bird_dir, bird_dir, -bird_dir]
+				bird_dirs = BIRD_PATTERNS[_rng.randi_range(0, BIRD_PATTERNS.size() - 1)].duplicate()
+				bird_dir = bird_dirs[1]
 				bird_response = 0
 				events.append({"type": "birds", "entry_side": bird_entry_side})
 			elif bird_phase == "approach" and bird_timer <= 0.0:
