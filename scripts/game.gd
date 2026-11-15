@@ -29,6 +29,8 @@ const GUST_TIMER_GAP_PIXELS := 8.0
 const GUST_TIMER_WIDTH := 100.0
 const SNOW_GUST_GRAVITY := 28.0
 const SNOW_BURST_DURATION := 0.8
+const SNOW_LAYER_THICKNESS := 0.22
+const GROUND_SNOW_THICKNESS := 0.08
 const TRAFFIC_START_Z := -440.0
 const TRAFFIC_END_Z := 50.0
 const STORIES := [
@@ -768,8 +770,15 @@ func _build_rooftop_skyscrapers() -> void:
 		body.name = "Facade"
 		var roof := _city_box(tower, Vector3(0.0, roof_y - roof_thickness * 0.5, 0.0), Vector3(19.0, roof_thickness, 24.0), Color("55586c"))
 		roof.name = "Walkable Roof"
+		var roof_snow := _snow_cap(tower, Vector3(0.0, roof_y, 0.0), Vector2(18.8, 23.8), Color("e1ebf2"), number)
+		roof_snow.name = "Roof Snow"
 		for side in [-1.0, 1.0]:
-			_city_box(tower, Vector3(side * 9.2, roof_y + 0.45, 0.0), Vector3(0.5, 1.3, 24.0), trim)
+			var side_rail := _city_box(tower, Vector3(side * 9.2, roof_y + 0.45, 0.0), Vector3(0.5, 1.3, 24.0), trim)
+			side_rail.name = "Side Rail"
+			var rail_size := (side_rail.mesh as BoxMesh).size
+			var rail_top := side_rail.position.y + rail_size.y * 0.5
+			var rail_snow := _snow_cap(tower, Vector3(side_rail.position.x, rail_top, 0.0), Vector2(rail_size.x + 0.06, 23.8), Color("e1ebf2"), number * 10 + int(side), 0.12, 0.025, 0.08)
+			rail_snow.name = "Side Rail Snow"
 			_city_box(tower, Vector3(side * 8.55, 15.0, 0.0), Vector3(0.25, 49.0, 0.35), trim)
 			for column in 3:
 				_city_box(tower, Vector3(side * 8.56, 16.0, (float(column) - 1.0) * 6.0), Vector3(0.16, 45.0, 0.16), trim)
@@ -808,6 +817,9 @@ func _build_cityscape() -> void:
 				var x := side * (distance + skyline_rng.randf_range(-4.0, 4.0))
 				var building := _city_box(city, Vector3(x, -12.0 + height * 0.5, z), Vector3(width, height, depth), walls[skyline_rng.randi_range(0, walls.size() - 1)])
 				building.name = "Building %d %d %d" % [int(side), row, index]
+				var snow_color := Color("d1dee8") if row == 0 else Color("b8c9d8")
+				var roof_snow := _snow_cap(city, Vector3(x, -12.0 + height, z), Vector2(width - 0.3, depth - 0.3), snow_color, side_index * 100 + row * 25 + index)
+				roof_snow.name = "Building Snow %d %d %d" % [int(side), row, index]
 				var inner_face := x - side * (width * 0.5 + 0.04)
 				for floor_number in range(2, int(height / 5.0)):
 					if skyline_rng.randf() < 0.28:
@@ -825,14 +837,19 @@ func _build_city_ground() -> void:
 	add_child(ground)
 	var street := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y - 0.5, -190.0), Vector3(78.0, 1.0, 500.0), Color("252a39"))
 	street.name = "Asphalt Street"
+	var street_snow := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y + GROUND_SNOW_THICKNESS * 0.5, -190.0), Vector3(77.5, GROUND_SNOW_THICKNESS, 499.5), Color("c5d1dc"))
+	street_snow.name = "Street Snow"
 	for side_index in 2:
 		var side := -1.0 if side_index == 0 else 1.0
 		var sidewalk := _city_box(ground, Vector3(side * 42.0, -12.25, -190.0), Vector3(8.0, 1.5, 500.0), Color("51566b"))
 		sidewalk.name = "Sidewalk %d" % side_index
+		var sidewalk_top := sidewalk.position.y + (sidewalk.mesh as BoxMesh).size.y * 0.5
+		var sidewalk_snow := _city_box(ground, Vector3(side * 42.0, sidewalk_top + GROUND_SNOW_THICKNESS * 0.5, -190.0), Vector3(7.8, GROUND_SNOW_THICKNESS, 499.5), Color("d6e0e8"))
+		sidewalk_snow.name = "Sidewalk Snow %d" % side_index
 		_city_box(ground, Vector3(side * 38.0, -11.7, -190.0), Vector3(0.6, 0.3, 500.0), Color("9a9bae"))
 		for index in 27:
 			var z := 49.0 - index * 18.0
-			_city_box(ground, Vector3(side * 13.0, -11.97, z), Vector3(0.35, 0.06, 7.0), Color("d4b77b"), true)
+			_city_box(ground, Vector3(side * 13.0, STREET_SURFACE_Y + GROUND_SNOW_THICKNESS + 0.01, z), Vector3(0.35, 0.02, 7.0), Color("d4b77b"), true)
 
 
 func _build_street_lights() -> void:
@@ -878,6 +895,55 @@ func _update_traffic(dt: float) -> void:
 		var car := traffic_lights[index]
 		var direction := 1.0 if index % 2 == 0 else -1.0
 		car.position.z = wrapf(car.position.z + direction * (14.0 + float(index % 3) * 2.0) * dt, TRAFFIC_START_Z, TRAFFIC_END_Z)
+
+
+func _snow_cap(parent: Node3D, at: Vector3, size: Vector2, color: Color, seed_value: int, thickness: float = SNOW_LAYER_THICKNESS, edge_variation: float = 0.3, bevel_width: float = 0.75) -> MeshInstance3D:
+	var corners: Array[Vector2] = [
+		Vector2(-size.x, -size.y) * 0.5,
+		Vector2(-size.x, size.y) * 0.5,
+		Vector2(size.x, size.y) * 0.5,
+		Vector2(size.x, -size.y) * 0.5,
+	]
+	var outward: Array[Vector2] = [Vector2.LEFT, Vector2.DOWN, Vector2.RIGHT, Vector2.UP]
+	var inner := PackedVector3Array()
+	var rim := PackedVector3Array()
+	var base := PackedVector3Array()
+	var inner_scale := Vector2(1.0 - bevel_width / (size.x * 0.5), 1.0 - bevel_width / (size.y * 0.5))
+	for side in 4:
+		for step in 12:
+			var edge := corners[side].lerp(corners[(side + 1) % 4], float(step) / 12.0)
+			if step == 0:
+				edge *= 0.97
+			var point_index := side * 12 + step
+			var angle := TAU * float(point_index) / 48.0
+			var wave := 0.68 * sin(angle * 5.0 + float(seed_value) * 0.31) + 0.32 * sin(angle * 11.0 + float(seed_value) * 0.73)
+			edge += outward[side] * wave * edge_variation
+			inner.append(Vector3(edge.x * inner_scale.x, thickness, edge.y * inner_scale.y))
+			rim.append(Vector3(edge.x, thickness * (0.58 + wave * 0.28), edge.y))
+			base.append(Vector3(edge.x, -0.02, edge.y))
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var center := Vector3(0.0, thickness, 0.0)
+	for point_index in rim.size():
+		var next := (point_index + 1) % rim.size()
+		_snow_triangle(surface, center, inner[point_index], inner[next])
+		_snow_triangle(surface, inner[point_index], rim[point_index], rim[next])
+		_snow_triangle(surface, inner[point_index], rim[next], inner[next])
+		_snow_triangle(surface, rim[point_index], base[point_index], base[next])
+		_snow_triangle(surface, rim[point_index], base[next], rim[next])
+	surface.generate_normals()
+	var node := MeshInstance3D.new()
+	node.mesh = surface.commit()
+	node.material_override = _material(color)
+	node.position = at
+	parent.add_child(node)
+	return node
+
+
+func _snow_triangle(surface: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
+	surface.add_vertex(a)
+	surface.add_vertex(c)
+	surface.add_vertex(b)
 
 
 func _city_box(parent: Node3D, at: Vector3, size: Vector3, color: Color, unshaded: bool = false, emission_energy: float = 0.0) -> MeshInstance3D:
