@@ -26,8 +26,9 @@ const ROPE_COLOR := Color("b5a38b")
 const HOT_COLOR := Color("ff5c46")
 const ROPE_BASE_EMISSION := 0.4
 const ROPE_HOT_EMISSION := 1.0
-const POLE_WAIST_Y := 1.15
-const POLE_FRONT_Z := -0.42
+const POLE_WAIST_Y := 1.9
+const POLE_FRONT_Z := -0.45
+const POLE_HAND_SPACING := 0.65
 const BIRD_HOVER_HEIGHT := 3.5
 const BIRD_TIMER_GAP_PIXELS := 5.0
 const GUST_TIMER_GAP_PIXELS := 8.0
@@ -92,6 +93,7 @@ var camera: Camera3D
 var walker: Node3D
 var walker_model: Node3D
 var walker_animation: AnimationPlayer
+var walker_skeleton: Skeleton3D
 var kenney_decor_count := 0
 var pole: MeshInstance3D
 var ropes: Array = []
@@ -214,8 +216,8 @@ func _process(delta: float) -> void:
 						_start_fall()
 						step_duration = 0.0
 						hud.show_toast("MISS", 1.0)
-						if walker_animation != null and walker_animation.has_animation("die"):
-							walker_animation.play("die")
+						if walker_animation != null:
+							walker_animation.stop()
 		if rules.state == "falling":
 			if not fall_started:
 				_start_fall()
@@ -395,7 +397,9 @@ func _update_step(dt: float) -> void:
 			hud.show_win(rules.finish_time, rules.falls, best_time)
 
 
-func _update_walker(_dt: float) -> void:
+func _update_walker(dt: float) -> void:
+	if walker_animation != null:
+		walker_animation.advance(dt)
 	var rope := Rules.rope_at(visual_z)
 	var feet := Vector3(0.0, FEET_Y, visual_z)
 	if not rope.is_empty() and rules.state != "falling":
@@ -417,6 +421,27 @@ func _update_walker(_dt: float) -> void:
 	walker.position = feet
 	walker.rotation.z = -rules.tilt * deg_to_rad(30.0)
 	pole.rotation.z = PI * 0.5 + rules.tilt * deg_to_rad(12.0)
+	_pose_walker_hands()
+
+
+func _pose_walker_hands() -> void:
+	if walker_skeleton == null:
+		return
+	for side in [-1.0, 1.0]:
+		var shoulder_name := "LeftShoulder" if side < 0.0 else "RightShoulder"
+		var hand_name := "LeftHand" if side < 0.0 else "RightHand"
+		var shoulder_index := walker_skeleton.find_bone(shoulder_name)
+		var hand_index := walker_skeleton.find_bone(hand_name)
+		if shoulder_index < 0 or hand_index < 0:
+			continue
+		var shoulder_pose := walker_skeleton.get_bone_global_pose(shoulder_index)
+		var hand_position := walker_skeleton.get_bone_global_pose(hand_index).origin
+		var grip_world := pole.to_global(Vector3(0.0, -side * POLE_HAND_SPACING, 0.0))
+		var grip_local := walker_skeleton.to_local(grip_world)
+		var current_direction := (hand_position - shoulder_pose.origin).normalized()
+		var grip_direction := (grip_local - shoulder_pose.origin).normalized()
+		shoulder_pose.basis = Basis(Quaternion(current_direction, grip_direction)) * shoulder_pose.basis
+		walker_skeleton.set_bone_global_pose(shoulder_index, shoulder_pose)
 
 
 func _update_birds() -> void:
@@ -899,7 +924,7 @@ func _build_world() -> void:
 
 
 func _build_walker_visual() -> void:
-	var path := "res://assets/kenney/blocky_characters/character-a.glb"
+	var path := "res://assets/grab3d/elderly-man-rigged.glb"
 	if ResourceLoader.exists(path):
 		var scene := load(path) as PackedScene
 		if scene != null:
@@ -907,7 +932,13 @@ func _build_walker_visual() -> void:
 			if walker_model != null:
 				walker.add_child(walker_model)
 				walker_model.rotation.y = PI
+				walker_model.scale = Vector3.ONE * 1.7
 				walker_animation = walker_model.find_child("AnimationPlayer", true, false) as AnimationPlayer
+				walker_skeleton = walker_model.find_child("Skeleton3D", true, false) as Skeleton3D
+				if walker_animation != null:
+					walker_animation.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+					if walker_animation.has_animation("walk"):
+						walker_animation.get_animation("walk").loop_mode = Animation.LOOP_LINEAR
 				_play_walker_animation("idle")
 				return
 	# Keep a visible walker if an asset is missing from a development checkout.
@@ -930,7 +961,11 @@ func _build_walker_visual() -> void:
 
 
 func _play_walker_animation(animation_name: StringName) -> void:
-	if walker_animation != null and walker_animation.has_animation(animation_name):
+	if walker_animation == null:
+		return
+	if animation_name == &"idle":
+		walker_animation.stop()
+	elif walker_animation.has_animation(animation_name):
 		walker_animation.play(animation_name)
 
 

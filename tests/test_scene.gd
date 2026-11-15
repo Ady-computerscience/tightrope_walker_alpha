@@ -614,27 +614,54 @@ func _process(_delta: float) -> bool:
 		return true
 	var decorations := game.get_node_or_null("Kenney Holiday Decorations")
 	if game.get("walker_model") == null or game.get("walker_animation") == null or game.get("kenney_decor_count") != 3 or decorations == null or decorations.get_child_count() != 3:
-		printerr("FAIL: Kenney character or remaining rooftop decorations did not load")
+		printerr("FAIL: elderly walker or remaining rooftop decorations did not load")
 		quit(1)
 		return true
 	var model: Node3D = game.get("walker_model")
+	if model.scene_file_path != "res://assets/grab3d/elderly-man-rigged.glb":
+		printerr("FAIL: walker did not load the new elderly-man asset")
+		quit(1)
+		return true
 	if model.transform.basis.z.dot(Vector3.FORWARD) < 0.99:
 		printerr("FAIL: walker does not face the next tower")
 		quit(1)
 		return true
 	var pole: MeshInstance3D = game.get("pole")
-	if pole == null or not is_equal_approx(pole.position.y, 1.15) or not is_equal_approx(pole.position.z, -0.42) or absf(pole.transform.basis.y.x) < 0.95 or not is_equal_approx((pole.mesh as CylinderMesh).top_radius, 0.055) or not is_equal_approx((pole.material_override as StandardMaterial3D).metallic, 1.0):
+	if pole == null or not is_equal_approx(pole.position.y, 1.9) or not is_equal_approx(pole.position.z, -0.45) or absf(pole.transform.basis.y.x) < 0.95 or not is_equal_approx((pole.mesh as CylinderMesh).top_radius, 0.055) or not is_equal_approx((pole.material_override as StandardMaterial3D).metallic, 1.0):
 		printerr("FAIL: balance pole is not horizontal in front of the waist")
 		quit(1)
 		return true
 	game.get("rules").tilt = 0.4
 	game.call("_update_walker", 0.0)
+	var skeleton: Skeleton3D = game.get("walker_skeleton")
+	if skeleton == null:
+		printerr("FAIL: elderly walker has no poseable skeleton")
+		quit(1)
+		return true
+	for side in [-1.0, 1.0]:
+		var hand_index := skeleton.find_bone("LeftHand" if side < 0.0 else "RightHand")
+		var hand_position := skeleton.to_global(skeleton.get_bone_global_pose(hand_index).origin)
+		var grip_position := pole.to_global(Vector3(0.0, -side * 0.65, 0.0))
+		if hand_position.distance_to(grip_position) > 0.35:
+			printerr("FAIL: elderly walker's hand does not reach the balance pole")
+			quit(1)
+			return true
 	if absf(pole.transform.basis.y.x) < 0.95:
 		printerr("FAIL: balance update turned the pole upright")
 		quit(1)
 		return true
 	game.set("mode", "walking")
 	game.call("_step", "left")
+	for frame in 10:
+		game.call("_update_walker", 0.1)
+		for side in [-1.0, 1.0]:
+			var hand_index := skeleton.find_bone("LeftHand" if side < 0.0 else "RightHand")
+			var hand_position := skeleton.to_global(skeleton.get_bone_global_pose(hand_index).origin)
+			var grip_position := pole.to_global(Vector3(0.0, -side * 0.65, 0.0))
+			if hand_position.distance_to(grip_position) > 0.4:
+				printerr("FAIL: walking animation moved a hand off the balance pole")
+				quit(1)
+				return true
 	if game.get("rules").step != 1 or game.get("last_step_foot") != "left" or game.get("walker_animation").current_animation != "walk":
 		printerr("FAIL: left foot step did not advance rules")
 		quit(1)

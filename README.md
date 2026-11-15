@@ -1,6 +1,6 @@
 # Tightrope Walker — Godot port
 
-A Godot 4.7 single-player port of the supplied Roblox game. The balance and stage rules are ported from `TightropeRules.luau`; the main scene uses Kenney’s animated Blocky Character as the walker and Holiday Kit models as winter decorations, alongside reactive ropes, HUD, snow, birds, and camera. The playable course now uses five detailed rooftop skyscrapers above a city street. The original exported world OBJ and PNG assets remain in `assets/world` as source material.
+A Godot 4.7 single-player port of the supplied Roblox game. The balance and stage rules are ported from `TightropeRules.luau`; the main scene uses Grab3D’s stylized elderly man as the walker and Kenney Holiday Kit models as winter decorations, alongside reactive ropes, HUD, snow, birds, and camera. The playable course now uses five detailed rooftop skyscrapers above a city street. The original exported world OBJ and PNG assets remain in `assets/world` as source material.
 
 ## Play
 
@@ -26,4 +26,4 @@ The rules test covers path layout, cooldowns, tower transitions, checkpoint beha
 
 ## Source and current limits
 
-The Roblox export supplies meshes and textures but no audio assets, rigged player model, or complete Roblox place. This port uses a Kenney Blocky Character and has no multiplayer or audio. The imported OBJ has static decoration; ropes are separately rendered and animated by Godot. The existing Luau scripts remain in the sibling `TightropeWalker_RobloxStudio` folder.
+The Roblox export supplies meshes and textures but no audio assets, rigged player model, or complete Roblox place. This port uses a [Grab3D elderly man](https://grab3d.com/models/characters/elderly-man/) and has no multiplayer or audio. The imported OBJ has static decoration; ropes are separately rendered and animated by Godot. The existing Luau scripts remain in the sibling `TightropeWalker_RobloxStudio` folder.
