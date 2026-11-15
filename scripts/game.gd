@@ -485,9 +485,6 @@ func _place_kenney_decor() -> void:
 	var decorations := Node3D.new()
 	decorations.name = "Kenney Holiday Decorations"
 	add_child(decorations)
-	for tower_number in range(1, Rules.TOWER_COUNT + 2):
-		var z := Rules.tower_z(tower_number)
-		_add_kenney_model(decorations, "lantern", Vector3(-4.0, FEET_Y - 0.7, z - 7.0), 1.1)
 	_add_kenney_model(decorations, "bench", Vector3(-3.8, FEET_Y - 0.7, Rules.tower_z(5) - 4.0), 1.7)
 	for x in [-2.8, 2.8]:
 		_add_kenney_model(decorations, "present-a-cube", Vector3(x, FEET_Y - 0.7, Rules.tower_z(5) - 5.5), 1.3)
