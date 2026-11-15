@@ -14,6 +14,9 @@ const MINT := Color("7ee8ac")
 const PANEL := Color("2c182e")
 const CONTROL_HINT_SECONDS := 10.0
 const COUNTDOWN_BAR_HEIGHT := 4.0
+const TOP_BANNER_SIDE_MARGIN := 24.0
+const TOP_BANNER_TOP_MARGIN := 16.0
+const TOP_BANNER_HEIGHT := 116.0
 
 var _progress: Label
 var _stage: Label
@@ -69,10 +72,11 @@ func show_countdown_bar(screen_position: Vector2, width: float, remaining_fracti
 		return
 	var viewport_size := get_viewport().get_visible_rect().size
 	var timer_width := clampf(width, 40.0, viewport_size.x - 24.0)
+	var minimum_y := TOP_BANNER_TOP_MARGIN + TOP_BANNER_HEIGHT + 8.0
 	_countdown_track.size.x = timer_width
 	_countdown_track.position = Vector2(
 		clampf(screen_position.x - timer_width * 0.5, 12.0, maxf(12.0, viewport_size.x - timer_width - 12.0)),
-		clampf(screen_position.y, 116.0, maxf(116.0, viewport_size.y - COUNTDOWN_BAR_HEIGHT - 12.0))
+		clampf(screen_position.y, minimum_y, maxf(minimum_y, viewport_size.y - COUNTDOWN_BAR_HEIGHT - 12.0))
 	)
 	_countdown_fill.size.x = timer_width * fraction
 	_countdown_fill_style.bg_color = WARNING_RED if fraction <= 0.25 else GOLD
@@ -120,16 +124,22 @@ func _build() -> void:
 	add_child(root)
 
 	var top := PanelContainer.new()
+	top.name = "Top Banner"
 	top.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	top.offset_bottom = 108.0
+	top.offset_left = TOP_BANNER_SIDE_MARGIN
+	top.offset_right = -TOP_BANNER_SIDE_MARGIN
+	top.offset_top = TOP_BANNER_TOP_MARGIN
+	top.offset_bottom = TOP_BANNER_TOP_MARGIN + TOP_BANNER_HEIGHT
 	top.add_theme_stylebox_override("panel", _panel_style())
 	root.add_child(top)
 	var top_box := VBoxContainer.new()
 	top_box.add_theme_constant_override("separation", 4)
 	top.add_child(top_box)
 	_progress = _label("TOWER 1 / 4", 21, GOLD)
+	_progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	top_box.add_child(_progress)
 	_stage = _label("WIND", 17, MINT)
+	_stage.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	top_box.add_child(_stage)
 	_balance = ProgressBar.new()
 	_balance.min_value = 0.0
@@ -139,6 +149,7 @@ func _build() -> void:
 	_balance.custom_minimum_size = Vector2(0, 12)
 	top_box.add_child(_balance)
 	_cue = _label("Keep the pole level", 14, CREAM)
+	_cue.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	top_box.add_child(_cue)
 
 	_countdown_track = Panel.new()
@@ -178,7 +189,7 @@ func _build() -> void:
 
 	_caption = _label("", 22, CREAM)
 	_caption.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_caption.offset_top = 124.0
+	_caption.offset_top = TOP_BANNER_TOP_MARGIN + TOP_BANNER_HEIGHT + 20.0
 	_caption.offset_left = -320.0
 	_caption.offset_right = 320.0
 	_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -188,7 +199,7 @@ func _build() -> void:
 
 	_toast = _label("", 22, GOLD)
 	_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_toast.offset_top = 184.0
+	_toast.offset_top = TOP_BANNER_TOP_MARGIN + TOP_BANNER_HEIGHT + 80.0
 	_toast.offset_left = -280.0
 	_toast.offset_right = 280.0
 	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
