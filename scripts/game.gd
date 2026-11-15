@@ -23,6 +23,8 @@ const BIRD_HOVER_HEIGHT := 3.5
 const BIRD_TIMER_GAP_PIXELS := 5.0
 const GUST_TIMER_GAP_PIXELS := 8.0
 const GUST_TIMER_WIDTH := 100.0
+const SNOW_GUST_GRAVITY := 28.0
+const SNOW_BURST_DURATION := 0.8
 const STORIES := [
 	"The skyline waits ahead. Find your balance and take the first step.",
 	"Even the birds doubt you. Let them watch you prove them wrong.",
@@ -42,6 +44,11 @@ var ropes: Array = []
 var birds: Array[Node3D] = []
 var gust_flag: Node3D
 var snow: CPUParticles3D
+var gust_snow: CPUParticles3D
+var _snow_gust_active := false
+var _bird_snow_remaining := 0.0
+var _bird_snow_direction := 0
+var _bird_snow_burst_pending := false
 var visual_z := -4.0
 var step_from := -4.0
 var step_to := -4.0
@@ -120,6 +127,7 @@ func _process(delta: float) -> void:
 					"birds": hud.show_toast("Birds incoming!")
 					"birds_arrived": hud.show_toast("Lean toward the middle bird")
 					"birds_pass": hud.show_toast("PASS", 1.0)
+					"bird_gust": _queue_bird_snow_burst(int(event["dir"]))
 					"gust_pass": hud.show_toast("PASS", 1.0)
 					"fall":
 						fall_elapsed = 0.0
@@ -142,6 +150,7 @@ func _process(delta: float) -> void:
 	_update_gust_visual()
 	_update_reaction_timer()
 	snow.position = camera.position + Vector3(0.0, 16.0, -18.0)
+	_update_snowfall(dt)
 	_update_hud()
 
 
@@ -202,6 +211,12 @@ func _restart() -> void:
 	hud.hide_win()
 	hud.hide_countdown_bar()
 	gust_flag.hide()
+	gust_snow.emitting = false
+	gust_snow.hide()
+	_snow_gust_active = false
+	_bird_snow_remaining = 0.0
+	_bird_snow_direction = 0
+	_bird_snow_burst_pending = false
 	hud.show_caption("")
 	hud.show_control_hint()
 	_announce_tower()
@@ -334,6 +349,35 @@ func _update_reaction_timer() -> void:
 		hud.show_countdown_bar(screen_position + Vector2(0.0, GUST_TIMER_GAP_PIXELS), GUST_TIMER_WIDTH, rules.wind_timer / Rules.WIND_RESPONSE_TIME)
 	else:
 		hud.hide_countdown_bar()
+
+
+func _queue_bird_snow_burst(direction: int) -> void:
+	_bird_snow_direction = signi(direction)
+	_bird_snow_remaining = SNOW_BURST_DURATION
+	_bird_snow_burst_pending = true
+
+
+func _update_snowfall(dt: float = 0.0) -> void:
+	var gust_strength := 0.0
+	var wind_blow_active := mode == "walking" and rules.state == "walking" and rules.on_rope and rules.wind_phase == "blow"
+	var burst_direction := rules.wind_dir
+	if _bird_snow_remaining > 0.0:
+		burst_direction = _bird_snow_direction
+		gust_strength = 1.0
+	elif wind_blow_active:
+		gust_strength = 0.4 + 0.6 * rules.wind_ramp
+	snow.direction = Vector3(float(burst_direction) * 2.0 * gust_strength, -1.0, 0.0).normalized()
+	snow.gravity = Vector3(float(burst_direction) * SNOW_GUST_GRAVITY * gust_strength, -2.0, 0.0)
+	gust_snow.position = camera.position - camera.global_transform.basis.z * 8.0 + camera.global_transform.basis.y
+	gust_snow.direction = Vector3(float(burst_direction), -0.15, 0.0).normalized()
+	gust_snow.gravity = Vector3(float(burst_direction) * 6.0, -2.0, 0.0)
+	if _bird_snow_burst_pending or (wind_blow_active and not _snow_gust_active):
+		gust_snow.show()
+		gust_snow.emitting = true
+		gust_snow.restart()
+	_bird_snow_burst_pending = false
+	_snow_gust_active = wind_blow_active
+	_bird_snow_remaining = maxf(0.0, _bird_snow_remaining - dt)
 
 
 func _update_ropes() -> void:
@@ -491,10 +535,11 @@ func _build_world() -> void:
 	snow = CPUParticles3D.new()
 	snow.amount = 300
 	snow.lifetime = 8.0
+	snow.local_coords = false
 	snow.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
 	snow.emission_box_extents = Vector3(22.0, 2.0, 24.0)
-	snow.direction = Vector3(0.2, -1.0, 0.0)
-	snow.gravity = Vector3(1.8, -2.0, 0.4)
+	snow.direction = Vector3.DOWN
+	snow.gravity = Vector3(0.0, -2.0, 0.0)
 	snow.initial_velocity_min = 2.0
 	snow.initial_velocity_max = 4.0
 	var flake := SphereMesh.new()
@@ -502,6 +547,21 @@ func _build_world() -> void:
 	flake.height = 0.14
 	snow.mesh = flake
 	add_child(snow)
+	gust_snow = CPUParticles3D.new()
+	gust_snow.name = "Gust Snow"
+	gust_snow.amount = 180
+	gust_snow.lifetime = SNOW_BURST_DURATION
+	gust_snow.one_shot = true
+	gust_snow.explosiveness = 1.0
+	gust_snow.local_coords = false
+	gust_snow.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	gust_snow.emission_box_extents = Vector3(8.0, 5.0, 7.0)
+	gust_snow.initial_velocity_min = 12.0
+	gust_snow.initial_velocity_max = 17.0
+	gust_snow.mesh = flake
+	gust_snow.emitting = false
+	add_child(gust_snow)
+	gust_snow.hide()
 	for star_number in 120:
 		var star := MeshInstance3D.new()
 		var star_mesh := SphereMesh.new()

@@ -194,7 +194,10 @@ func _process(_delta: float) -> bool:
 	startup_rules.wind_flag_side = -1
 	game.call("_update_gust_visual")
 	game.call("_update_reaction_timer")
-	if not gust_flag.visible or gust_flag.position.x >= 0.0 or timer_track.visible:
+	game.call("_update_snowfall")
+	var snowfall: CPUParticles3D = game.get("snow")
+	var gust_snow: CPUParticles3D = game.get("gust_snow")
+	if not gust_flag.visible or gust_flag.position.x >= 0.0 or timer_track.visible or snowfall.local_coords or not is_zero_approx(snowfall.gravity.x) or gust_snow.visible:
 		printerr("FAIL: gust flag did not appear on the left during the cue")
 		quit(1)
 		return true
@@ -214,8 +217,21 @@ func _process(_delta: float) -> bool:
 	startup_rules.wind_dir = 1
 	startup_rules.wind_flag_side = -1
 	startup_rules.wind_timer = Rules.WIND_RESPONSE_TIME
+	startup_rules.wind_ramp = 0.5
 	game.call("_update_gust_visual")
 	game.call("_update_reaction_timer")
+	game.call("_update_snowfall")
+	if not is_zero_approx(snowfall.gravity.x) or not is_zero_approx(snowfall.direction.x) or gust_snow.visible:
+		printerr("FAIL: snowfall burst started before the reaction countdown ended")
+		quit(1)
+		return true
+	startup_rules.wind_dir = -1
+	game.call("_update_snowfall")
+	if not is_zero_approx(snowfall.gravity.x) or gust_snow.visible:
+		printerr("FAIL: changing the cue direction started a burst during the countdown")
+		quit(1)
+		return true
+	startup_rules.wind_dir = 1
 	game.call("_update_hud")
 	var gust_caption: Label = hud.get("_caption")
 	var gust_status: Label = hud.get("_cue")
@@ -239,14 +255,21 @@ func _process(_delta: float) -> bool:
 	startup_rules.wind_phase = "blow"
 	game.call("_update_gust_visual")
 	game.call("_update_reaction_timer")
-	if timer_track.visible or gust_flag.visible:
-		printerr("FAIL: gust countdown or flag remained visible after response")
+	game.call("_update_snowfall")
+	if timer_track.visible or gust_flag.visible or snowfall.gravity.x < 10.0 or snowfall.direction.x <= 0.0 or not gust_snow.visible or not gust_snow.emitting or gust_snow.direction.x <= 0.0 or not get_root().get_visible_rect().has_point(camera.unproject_position(gust_snow.global_position)):
+		printerr("FAIL: snowfall burst did not begin when the countdown ended")
 		quit(1)
 		return true
 	startup_rules.on_rope = false
 	startup_rules.wind_phase = "rest"
 	startup_rules.wind_timer = 2.5
+	startup_rules.wind_ramp = 0.0
 	game.call("_update_gust_visual")
+	game.call("_update_snowfall")
+	if not is_zero_approx(snowfall.gravity.x) or not is_zero_approx(snowfall.direction.x):
+		printerr("FAIL: snowfall did not return to calm after the gust")
+		quit(1)
+		return true
 	startup_rules.last_step_at = startup_rules.time
 	game.call("_step", "left")
 	if game.get("has_taken_first_step"):
@@ -284,6 +307,47 @@ func _process(_delta: float) -> bool:
 	hud.call("_process", 30.0)
 	if hint.visible:
 		printerr("FAIL: control hint reappeared without a restart")
+		quit(1)
+		return true
+	game.call("_restart")
+	var bird_snow_rules: TightropeRules = game.get("rules")
+	bird_snow_rules.tower = 2
+	bird_snow_rules.on_rope = true
+	bird_snow_rules.wind_timer = 5.0
+	bird_snow_rules.bird_phase = "warn"
+	bird_snow_rules.bird_timer = 0.5
+	bird_snow_rules.bird_dir = 1
+	game.call("_update_snowfall")
+	if gust_snow.visible or not is_zero_approx(snowfall.gravity.x):
+		printerr("FAIL: bird snow burst appeared during the reaction countdown")
+		quit(1)
+		return true
+	Input.action_press("lean_right")
+	game.call("_process", 1.0 / 60.0)
+	Input.action_release("lean_right")
+	if bird_snow_rules.bird_phase != "rest" or not gust_snow.visible or gust_snow.direction.x >= 0.0 or snowfall.gravity.x >= 0.0:
+		printerr("FAIL: successful bird trial did not burst snow opposite the center bird")
+		quit(1)
+		return true
+	game.call("_restart")
+	var missed_bird_rules: TightropeRules = game.get("rules")
+	missed_bird_rules.tower = 2
+	missed_bird_rules.on_rope = true
+	missed_bird_rules.wind_timer = 5.0
+	missed_bird_rules.bird_phase = "warn"
+	missed_bird_rules.bird_timer = 0.5
+	missed_bird_rules.bird_dir = -1
+	Input.action_press("lean_right")
+	game.call("_process", 1.0 / 60.0)
+	Input.action_release("lean_right")
+	if missed_bird_rules.state != "falling" or not gust_snow.visible or gust_snow.direction.x <= 0.0 or snowfall.gravity.x <= 0.0:
+		printerr("FAIL: failed bird trial did not burst snow before the fall")
+		quit(1)
+		return true
+	game.call("_update_snowfall", 1.0)
+	game.call("_update_snowfall")
+	if not is_zero_approx(snowfall.gravity.x):
+		printerr("FAIL: bird snow drift did not end after the burst")
 		quit(1)
 		return true
 	game.call("_restart")
