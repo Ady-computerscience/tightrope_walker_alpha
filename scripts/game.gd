@@ -444,7 +444,7 @@ func _build_world() -> void:
 			bird_animation.play(BIRD_FLY_ANIMATION)
 		birds.append(bird)
 	snow = CPUParticles3D.new()
-	snow.amount = 120
+	snow.amount = 300
 	snow.lifetime = 8.0
 	snow.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
 	snow.emission_box_extents = Vector3(22.0, 2.0, 24.0)
