@@ -19,6 +19,7 @@ const FALL_GRAVITY := 26.0
 const ROPE_Y := 44.87
 const STATIC_SAG := 0.25
 const LOAD_SAG := 0.9
+const FIRST_THREE_LOAD_SAG := 1.5
 const ROPE_SEGMENTS := 26
 const ROPE_RADIUS := 0.045
 const BALANCE_POLE_RADIUS := 0.055
@@ -404,9 +405,10 @@ func _update_walker(dt: float) -> void:
 	var feet := Vector3(0.0, FEET_Y, visual_z)
 	if not rope.is_empty() and rules.state != "falling":
 		var s: float = rope["progress"]
+		var tower_number := int(rope["tower"])
 		var sag := STATIC_SAG * 4.0 * s * (1.0 - s)
-		var load_sag := LOAD_SAG * 4.0 * s * (1.0 - s) * (1.0 - 0.55 * rules.tension)
-		feet.y -= (sag + load_sag) * _rope_sag_factor(rope, int(rope["tower"]))
+		var load_sag := _load_rope_sag(tower_number) * 4.0 * s * (1.0 - s) * (1.0 - 0.55 * rules.tension)
+		feet.y -= (sag + load_sag) * _rope_sag_factor(rope, tower_number)
 		feet.x = rules.tilt * 0.35
 		if rules.stage_kind() == "Sway":
 			feet.x += rules.sway * 1.6 * sin(PI * s)
@@ -568,9 +570,13 @@ func _rope_point(tower_number: int, s: float, current: Dictionary) -> Vector3:
 	if not current.is_empty() and tower_number == current["tower"]:
 		var load: float = current["progress"]
 		var triangle := s / load if s <= load and load > 0.0 else ((1.0 - s) / (1.0 - load) if s > load and load < 1.0 else 0.0)
-		y -= LOAD_SAG * 4.0 * load * (1.0 - load) * triangle * (1.0 - 0.55 * rules.tension) * sag_factor
+		y -= _load_rope_sag(tower_number) * 4.0 * load * (1.0 - load) * triangle * (1.0 - 0.55 * rules.tension) * sag_factor
 		x += rules.tilt * 0.35 * triangle
 	return Vector3(x, y, z)
+
+
+func _load_rope_sag(tower_number: int) -> float:
+	return FIRST_THREE_LOAD_SAG if tower_number <= 3 else LOAD_SAG
 
 
 func _rope_sag_factor(current: Dictionary, tower_number: int) -> float:

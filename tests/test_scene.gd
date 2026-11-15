@@ -497,6 +497,9 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: five rooftop skyscrapers were not built")
 		quit(1)
 		return true
+	var fourth_walking_rope := Rules.rope_at(Rules.step_z(4, 4))
+	var fourth_loaded_midpoint: Vector3 = game.call("_rope_point", 4, 0.5, fourth_walking_rope)
+	var fourth_load_dip := float(game.call("_roof_anchor_point", 4).y) - fourth_loaded_midpoint.y
 	for tower in towers.get_children():
 		var facade_body := tower.get_node_or_null("Facade") as MeshInstance3D
 		var roof := tower.get_node_or_null("Walkable Roof") as MeshInstance3D
@@ -540,8 +543,13 @@ func _process(_delta: float) -> bool:
 			var walking_rope := Rules.rope_at(Rules.step_z(tower_number, 4))
 			var parked_midpoint: Vector3 = game.call("_rope_point", tower_number, 0.5, parked_rope)
 			var loaded_midpoint: Vector3 = game.call("_rope_point", tower_number, 0.5, walking_rope)
-			if not parked_rope.is_empty() or not is_equal_approx(parked_midpoint.y, roof_anchor.y) or loaded_midpoint.y >= parked_midpoint.y:
-				printerr("FAIL: rope load sag began before the walker passed the edge anchor on tower %d" % tower_number)
+			var loaded_dip := roof_anchor.y - loaded_midpoint.y
+			if not parked_rope.is_empty() or not is_equal_approx(parked_midpoint.y, roof_anchor.y) or loaded_dip <= 0.0:
+				printerr("FAIL: rope %d changed resting slack or lost its load dip" % tower_number)
+				quit(1)
+				return true
+			if tower_number <= 3 and loaded_dip <= fourth_load_dip + 0.35:
+				printerr("FAIL: rope %d does not dip farther under the stuntman than rope four" % tower_number)
 				quit(1)
 				return true
 			var near_edge_z := front_edge - 1.0
