@@ -119,6 +119,18 @@ func stage_kind() -> String:
 	return STAGES[tower - 1]
 
 
+func birds_enabled() -> bool:
+	return tower == 2 or tower == 4
+
+
+func tension_enabled() -> bool:
+	return tower >= 3
+
+
+func sway_enabled() -> bool:
+	return tower == 4
+
+
 static func bird_check(response_direction: int, direction: int) -> bool:
 	return response_direction == direction
 
@@ -146,7 +158,7 @@ func update(delta: float, lean: float, gust_response: int = 0) -> Array[Dictiona
 	if WIND_ENABLED:
 		stage_push += _update_wind(dt, gust_response, events)
 	match stage_kind():
-		"Birds":
+		"Birds", "Sway":
 			if bird_gust_timer > 0.0:
 				bird_gust_timer = maxf(0.0, bird_gust_timer - dt)
 				stage_push -= bird_dir * BIRD_GUST_PUSH
@@ -182,16 +194,16 @@ func update(delta: float, lean: float, gust_response: int = 0) -> Array[Dictiona
 					if not survived:
 						_fall("birds", events, -bird_dir)
 						return events
-		"Tension":
-			tension += dt * TENSION_RATE
-			stage_push += sin(time * 11.0) * tension * TENSION_JITTER
-			if tension >= 1.0:
-				tension = 1.0
-				_fall("snap", events)
-				return events
-		"Sway":
-			sway = sin(stage_time * SWAY_SPEED)
-			stage_push += sway * SWAY_PUSH
+	if tension_enabled():
+		tension += dt * TENSION_RATE
+		stage_push += sin(time * 11.0) * tension * TENSION_JITTER
+		if tension >= 1.0:
+			tension = 1.0
+			_fall("snap", events)
+			return events
+	if sway_enabled():
+		sway = sin(stage_time * SWAY_SPEED)
+		stage_push += sway * SWAY_PUSH
 	push = stage_push
 	var lean_input := clampf(lean, -1.0, 1.0)
 	var kick := LEAN_START_KICK if absf(lean_input) > absf(last_lean_input) else LEAN_KICK
@@ -212,7 +224,7 @@ func _update_wind(dt: float, response: int, events: Array[Dictionary]) -> float:
 	var had_time := wind_timer > 0.0
 	if wind_phase == "rest":
 		wind_timer -= dt
-		if interruption_safe_timer > 0.0 or (stage_kind() == "Birds" and (bird_phase != "rest" or bird_gust_timer > 0.0)):
+		if interruption_safe_timer > 0.0 or (birds_enabled() and (bird_phase != "rest" or bird_gust_timer > 0.0)):
 			return 0.0
 		if wind_timer <= 0.0:
 			wind_dir = _random_sign()
@@ -266,9 +278,9 @@ func try_step() -> String:
 		return "blocked"
 	last_step_at = time
 	var result := "ok"
-	if on_rope and stage_kind() == "Tension":
+	if on_rope and tension_enabled():
 		tension = minf(0.99, tension + TENSION_PER_STEP)
-	elif on_rope and stage_kind() == "Sway" and not sway_safe(sway):
+	if on_rope and sway_enabled() and not sway_safe(sway):
 		tilt_vel += (1 if sway >= 0.0 else -1) * SWAY_SHOVE
 		result = "shove"
 	if on_rope:
@@ -288,7 +300,7 @@ func try_step() -> String:
 
 
 func release() -> String:
-	if state != "walking" or not on_rope or stage_kind() != "Tension":
+	if state != "walking" or not on_rope or not tension_enabled():
 		return "none"
 	if time - last_release_at < RELEASE_COOLDOWN:
 		return "cooldown"

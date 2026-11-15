@@ -410,7 +410,7 @@ func _update_walker(dt: float) -> void:
 		var load_sag := _load_rope_sag(tower_number) * 4.0 * s * (1.0 - s) * (1.0 - 0.55 * rules.tension)
 		feet.y -= (sag + load_sag) * _rope_sag_factor(rope, tower_number)
 		feet.x = rules.tilt * 0.35
-		if rules.stage_kind() == "Sway":
+		if rules.sway_enabled():
 			feet.x += rules.sway * 1.6 * sin(PI * s)
 	if rules.state == "falling":
 		if not fall_started:
@@ -447,7 +447,7 @@ func _pose_walker_hands() -> void:
 
 
 func _update_birds() -> void:
-	var active := rules.stage_kind() == "Birds" and (rules.bird_phase == "approach" or rules.bird_phase == "warn") and rules.state == "walking"
+	var active := rules.birds_enabled() and (rules.bird_phase == "approach" or rules.bird_phase == "warn") and rules.state == "walking"
 	for index in birds.size():
 		var bird := birds[index]
 		bird.visible = active
@@ -479,7 +479,7 @@ func _update_reaction_timer() -> void:
 	if rules.state != "walking":
 		hud.hide_countdown_bar()
 		return
-	if rules.stage_kind() == "Birds" and rules.bird_phase == "warn":
+	if rules.birds_enabled() and rules.bird_phase == "warn":
 		var center_position := birds[1].global_position
 		if camera.is_position_behind(center_position):
 			hud.hide_countdown_bar()
@@ -565,7 +565,7 @@ func _rope_point(tower_number: int, s: float, current: Dictionary) -> Vector3:
 	var sag_factor := _rope_sag_factor(current, tower_number)
 	var y := ROPE_Y - STATIC_SAG * 4.0 * s * (1.0 - s) * sag_factor
 	var x := 0.0
-	if tower_number == rules.tower and rules.stage_kind() == "Sway":
+	if tower_number == rules.tower and rules.sway_enabled():
 		x += rules.sway * 1.6 * sin(PI * s)
 	if not current.is_empty() and tower_number == current["tower"]:
 		var load: float = current["progress"]
@@ -645,7 +645,17 @@ func _update_hud() -> void:
 			"Wind": cue = "Watch for the flag"
 			"Birds": cue = "Center bird: Q / P  %.1fs" % rules.bird_timer if rules.bird_phase == "warn" else ("Bird gust!" if rules.bird_gust_timer > 0.0 else ("Birds incoming" if rules.bird_phase == "approach" else "Watch for the birds"))
 			"Tension": cue = "Tension: %.0f%%  •  Space to release" % [rules.tension * 100.0]
-			"Sway": cue = "Sway: %.0f%%  •  Step near center" % [rules.sway * 100.0]
+			"Sway":
+				if rules.bird_phase == "warn":
+					cue = "Center bird: Q / P  %.1fs" % rules.bird_timer
+				elif rules.wind_phase == "cue" or rules.wind_phase == "react":
+					cue = "Watch for the flag"
+				elif rules.bird_phase == "approach":
+					cue = "Birds incoming"
+				elif rules.bird_gust_timer > 0.0:
+					cue = "Bird gust!"
+				else:
+					cue = "Sway: %.0f%%  •  Space: release wire" % [rules.sway * 100.0]
 	hud.show_status(rules.tower, rules.step, Rules.STEPS_PER_TOWER, rules.stage_kind(), rules.tilt, cue, rules.tension)
 
 

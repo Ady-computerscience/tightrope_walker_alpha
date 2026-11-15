@@ -206,6 +206,20 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: bird countdown did not shrink at half time")
 		quit(1)
 		return true
+	bird_rules.tower = 4
+	bird_rules.on_rope = true
+	game.call("_update_birds")
+	game.call("_update_reaction_timer")
+	game.call("_update_hud")
+	var stage_four_cue: Label = bird_hud.get("_cue")
+	var stage_four_gauge: PanelContainer = bird_hud.get("_wire_gauge_panel")
+	if not center_bird.visible or not timer_track.visible or not stage_four_gauge.visible or not stage_four_cue.text.begins_with("Center bird"):
+		printerr("FAIL: stage four does not show the birds, reaction timer, gauge, and bird cue together: bird=%s timer=%s gauge=%s cue=%s" % [center_bird.visible, timer_track.visible, stage_four_gauge.visible, stage_four_cue.text])
+		quit(1)
+		return true
+	bird_rules.tower = 2
+	bird_rules.on_rope = false
+	game.call("_update_hud")
 	bird_rules.bird_timer = Rules.BIRD_WARN * 0.25
 	game.call("_update_reaction_timer")
 	if not is_equal_approx(timer_fill.size.x, expected_width * 0.25) or fill_style.bg_color != GameHUD.WARNING_RED:
@@ -259,6 +273,11 @@ func _process(_delta: float) -> bool:
 	wire_gauge.call("_process", 0.25)
 	if not wire_gauge_panel.visible or not is_equal_approx(wire_gauge.tension, 0.9) or wire_gauge.displayed_tension <= 0.0:
 		printerr("FAIL: wire tension gauge did not reveal and move its needle")
+		quit(1)
+		return true
+	hud.show_status(4, 0, Rules.STEPS_PER_TOWER, "Sway", 0.0, "Step near center", 0.0)
+	if not wire_gauge_panel.visible or not is_zero_approx(wire_gauge.tension):
+		printerr("FAIL: wire tension gauge disappeared or kept stale tension in stage four")
 		quit(1)
 		return true
 	hud.show_status(1, 0, Rules.STEPS_PER_TOWER, "Wind", 0.0, "Keep the pole level")

@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_test_interruption_safe_period()
 	_test_tension()
 	_test_sway()
+	_test_stage_four_combo()
 	_test_determinism()
 	_test_full_run(11)
 	_test_full_run(29)
@@ -370,6 +371,45 @@ func _test_sway() -> void:
 	_check(safe.try_step() == "ok", "safe sway allows step")
 
 
+func _test_stage_four_combo() -> void:
+	var run := Rules.new(17)
+	run.tower = 4
+	_check(run.birds_enabled() and run.tension_enabled() and run.sway_enabled(), "stage four enables birds, tension, and sway alongside wind")
+	_enter_rope(run)
+	var saw_birds := false
+	var saw_wind := false
+	var saw_sway := false
+	var released_tension := false
+	for frame in 60 * 12:
+		run.tilt = 0.0
+		run.tilt_vel = 0.0
+		var lean := float(run.bird_dir) if run.bird_phase == "warn" else 0.0
+		var response := -run.wind_flag_side if run.wind_phase == "react" else 0
+		for event in run.update(1.0 / 60.0, lean, response):
+			if event["type"] == "birds_pass":
+				saw_birds = true
+			elif event["type"] == "gust_pass":
+				saw_wind = true
+		saw_sway = saw_sway or absf(run.sway) > 0.1
+		if run.tension > 0.5:
+			released_tension = run.release() == "released" or released_tension
+		if saw_birds and saw_wind and saw_sway and released_tension:
+			break
+	_check(run.state == "walking" and saw_birds and saw_wind and saw_sway and released_tension, "stage four runs all four interruptions and lets the player pass them")
+
+	var step_run := Rules.new(18)
+	step_run.tower = 4
+	_enter_rope(step_run)
+	step_run.time += 0.5
+	step_run.sway = 0.9
+	step_run.tension = 0.1
+	_check(step_run.try_step() == "shove" and is_equal_approx(step_run.tension, 0.17), "stage four step applies sway and tension together")
+	_check(step_run.release() == "released" and is_zero_approx(step_run.tension), "stage four can release tension")
+	step_run.tension = 0.995
+	var snap_events := step_run.update(0.1, 0.0)
+	_check(step_run.state == "falling" and snap_events.any(func(event: Dictionary) -> bool: return event.get("reason") == "snap"), "stage four wire still snaps at full tension")
+
+
 func _test_determinism() -> void:
 	var first := Rules.new(42)
 	var second := Rules.new(42)
@@ -385,23 +425,33 @@ func _test_determinism() -> void:
 func _test_full_run(seed_value: int) -> void:
 	var run := Rules.new(seed_value)
 	var since_step := 0.0
+	var stage_four_birds := false
+	var stage_four_wind := false
+	var stage_four_tension := false
+	var stage_four_sway := false
 	for tick in 60 * 400:
 		var target := 0.0
-		if run.stage_kind() == "Birds" and run.bird_phase == "warn":
+		if run.birds_enabled() and run.bird_phase == "warn":
 			target = 0.3 * run.bird_dir
 		var lean: float = clampf(-((run.tilt - target) * 2.5 + run.tilt_vel * 1.4) - (run.push + run.tilt * Rules.INSTABILITY) / Rules.LEAN_POWER, -1.0, 1.0)
 		var gust_response := -run.wind_flag_side if run.wind_phase == "react" else 0
 		var events := run.update(1.0 / 60.0, lean, gust_response)
 		for event in events:
+			if run.tower == 4:
+				stage_four_birds = stage_four_birds or event["type"] == "birds"
+				stage_four_wind = stage_four_wind or event["type"] == "gust_cue"
 			if event["type"] == "fall":
 				run.respawn()
-		if run.stage_kind() == "Tension" and run.tension > 0.6:
+		if run.tower == 4:
+			stage_four_sway = stage_four_sway or absf(run.sway) > 0.1
+		if run.tension_enabled() and run.tension > 0.6:
+			stage_four_tension = stage_four_tension or run.tower == 4
 			run.release()
 		since_step += 1.0 / 60.0
 		var can_step := since_step > 0.5 and absf(run.tilt) < 0.35
-		if run.stage_kind() == "Sway":
+		if run.sway_enabled():
 			can_step = can_step and absf(run.sway) < 0.2
-		if run.stage_kind() == "Birds" and run.bird_phase == "warn":
+		if run.birds_enabled() and run.bird_phase == "warn":
 			can_step = false
 		if can_step:
 			var result := run.try_step()
@@ -413,5 +463,6 @@ func _test_full_run(seed_value: int) -> void:
 				run.reach_tower()
 			if result == "won":
 				_check(run.state == "won" and run.tower == 4, "seed %d win state" % seed_value)
+				_check(stage_four_birds and stage_four_wind and stage_four_tension and stage_four_sway, "seed %d encountered all four minigames in stage four" % seed_value)
 				return
 	_check(false, "seed %d could not complete course" % seed_value)

@@ -69,7 +69,7 @@ func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, c
 	_progress.text = "TOWER %02d / 04     STEP %02d / %02d" % [tower, step, steps]
 	_stage.text = kind.to_upper()
 	_cue.text = cue
-	_wire_gauge_panel.visible = kind == "Tension"
+	_wire_gauge_panel.visible = tower >= 3
 	_wire_gauge.set_tension(tension)
 	_balance.value = clampf((tilt + 1.0) * 50.0, 0.0, 100.0)
 	var fill := _balance.get_theme_stylebox("fill") as StyleBoxFlat
