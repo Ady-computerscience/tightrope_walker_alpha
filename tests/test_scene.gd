@@ -20,6 +20,12 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: game scene did not initialize")
 		quit(1)
 		return true
+	var opening_snow: CPUParticles3D = game.get("snow")
+	var opening_camera: Camera3D = game.get("camera")
+	if not opening_snow.emitting or opening_snow.preprocess < opening_snow.lifetime or opening_snow.position.distance_to(opening_camera.position + Vector3(0.0, 16.0, -18.0)) > 0.1:
+		printerr("FAIL: snowfall was not ready around the camera before the intro pan")
+		quit(1)
+		return true
 	if game.get("rules").on_rope or not Rules.rope_at(game.get("visual_z")).is_empty():
 		printerr("FAIL: stuntman did not start safely on the rooftop")
 		quit(1)

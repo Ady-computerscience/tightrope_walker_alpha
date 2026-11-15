@@ -857,7 +857,10 @@ func _build_world() -> void:
 	snow = CPUParticles3D.new()
 	snow.amount = 300
 	snow.lifetime = 8.0
+	snow.preprocess = snow.lifetime
+	snow.emitting = true
 	snow.local_coords = false
+	snow.position = INTRO_START_POSITION + Vector3(0.0, 16.0, -18.0)
 	snow.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
 	snow.emission_box_extents = Vector3(22.0, 2.0, 24.0)
 	snow.direction = Vector3.DOWN
