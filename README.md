@@ -10,6 +10,8 @@ The control hint appears at the bottom only when the game starts or is explicitl
 
 The first rope section introduces Gust Warning. A flag appears on the side the gust will come from. Press **Q/P** to lean away from the flag during the one-second response window. Leaning toward the flag or missing the response triggers a strong gust that makes the walker fall. Gust Warning remains active on later sections alongside their other interruptions. A fall returns the walker to the last reached tower. The final step opens a win card; **Stargaze** plays the ending camera move.
 
+The four crossings move from blue daylight to orange and pink sunset, purple dusk, and night. The sun descends during the first crossing and sets during the second; the moon rises through the third and fourth. Sky colors, city lighting, fog, and the dark overlay blend when a new stage begins.
+
 ## Tests
 
 Run the import once on a fresh checkout, then run the tests:
@@ -20,7 +22,7 @@ godot --headless --path . --script res://tests/test_rules.gd
 godot --headless --path . --script res://tests/test_scene.gd
 ```
 
-The rules test covers path layout, cooldowns, tower transitions, checkpoint behavior, gust warnings, birds, tension, sway, deterministic seeds, and two full successful runs. The scene test checks skyscraper construction, HUD creation, gust flag placement, and step wiring.
+The rules test covers path layout, cooldowns, tower transitions, checkpoint behavior, gust warnings, birds, tension, sway, deterministic seeds, and two full successful runs. The scene test checks skyscraper construction, the four sky stages and celestial motion, HUD creation, gust flag placement, and step wiring.
 
 ## Source and current limits
 

@@ -41,6 +41,17 @@ const TAILLIGHT_GLOW_ENERGY := 4.8
 const BEACON_BUILDING_INDICES := [3, 8, 14, 19]
 const RED_BEACON_PERIOD := 1.5
 const RED_BEACON_FLASH_DURATION := 0.24
+const SKY_TOP_COLORS := ["2377c9", "674790", "17265e", "08091b"]
+const SKY_MID_COLORS := ["65b5ee", "e87ca4", "755fba", "0d1030"]
+const SKY_HORIZON_COLORS := ["c9ecff", "ffad62", "c29cd8", "12122c"]
+const SUN_ELEVATIONS := [20.0, 7.0, -12.0, -12.0, -12.0]
+const MOON_ELEVATIONS := [-3.0, -3.0, -3.0, 12.0, 22.0]
+const AMBIENT_COLORS := ["b8d9ff", "ffc1a8", "aa9bdb", "5c5c9c"]
+const KEY_LIGHT_COLORS := ["fff0d1", "ffb577", "a8a6d9", "b5bbff"]
+const KEY_LIGHT_ENERGIES := [1.1, 0.72, 0.34, 0.2]
+const AMBIENT_ENERGIES := [0.65, 0.43, 0.24, 0.10]
+const DARKNESS_ALPHAS := [0.0, 0.04, 0.12, 0.22]
+const STAGE_SKY_BLEND_SPEED := 0.8
 const ROOF_SPIKE_COLOR := Color("7c829e")
 const SNOW_LAYER_THICKNESS := 0.22
 const GROUND_SNOW_THICKNESS := 0.08
@@ -79,6 +90,14 @@ var traffic_lights: Array[Node3D] = []
 var _static_light_halos: Array[Dictionary] = []
 var _red_beacons: Array[Dictionary] = []
 var _red_beacon_elapsed := 0.0
+var _sky_stage := 0.0
+var _last_atmosphere_stage := -1.0
+var _last_atmosphere_z := INF
+var _sky_material: ShaderMaterial
+var _world_environment: Environment
+var _key_light: DirectionalLight3D
+var _moon_glow: DirectionalLight3D
+var _darkness: ColorRect
 var _halo_material: StandardMaterial3D
 var _halo_quad: QuadMesh
 var _snow_gust_active := false
@@ -118,6 +137,7 @@ func _ready() -> void:
 	rules = Rules.new()
 	visual_z = Rules.step_z(1, 0)
 	_build_world()
+	_update_atmosphere(0.0)
 	_update_walker(0.0)
 	camera_position = INTRO_START_POSITION
 	camera_look = INTRO_START_LOOK
@@ -192,6 +212,7 @@ func _process(delta: float) -> void:
 			else:
 				fall_elapsed += dt
 	_update_step(dt)
+	_update_atmosphere(dt)
 	_update_traffic(dt)
 	_update_walker(dt)
 	_update_birds()
@@ -290,6 +311,8 @@ func _restart() -> void:
 	_bird_snow_remaining = 0.0
 	_bird_snow_direction = 0
 	_bird_snow_burst_pending = false
+	_sky_stage = 0.0
+	_update_atmosphere(0.0)
 	hud.show_caption("")
 	hud.show_control_hint()
 	_announce_tower()
@@ -585,17 +608,67 @@ func _announce_tower(subtitle: String = "") -> void:
 	hud.show_toast("Tower %d: %s" % [rules.tower, text])
 
 
+func _stage_color(colors: Array, stage: float) -> Color:
+	var first := clampi(floori(stage), 0, Rules.TOWER_COUNT - 1)
+	var second := mini(first + 1, Rules.TOWER_COUNT - 1)
+	return Color(String(colors[first])).lerp(Color(String(colors[second])), stage - float(first))
+
+
+func _stage_value(values: Array, stage: float) -> float:
+	var last := values.size() - 1
+	var first := clampi(floori(stage), 0, last)
+	var second := mini(first + 1, last)
+	return lerpf(float(values[first]), float(values[second]), stage - float(first))
+
+
+func _update_atmosphere(dt: float) -> void:
+	var target_stage := float(rules.tower - 1)
+	_sky_stage = move_toward(_sky_stage, target_stage, dt * STAGE_SKY_BLEND_SPEED)
+	if is_equal_approx(_sky_stage, _last_atmosphere_stage) and is_equal_approx(visual_z, _last_atmosphere_z):
+		return
+	_last_atmosphere_stage = _sky_stage
+	_last_atmosphere_z = visual_z
+	var course_progress := clampf((Rules.step_z(1, 0) - visual_z) / Rules.TOWER_SPACING, 0.0, float(Rules.TOWER_COUNT))
+	var sun_elevation := _stage_value(SUN_ELEVATIONS, course_progress)
+	var moon_elevation := _stage_value(MOON_ELEVATIONS, course_progress)
+	var sun_direction := Vector3(0.35, sin(deg_to_rad(sun_elevation)), -1.0).normalized()
+	var moon_direction := Vector3(-0.35, sin(deg_to_rad(moon_elevation)), -1.0).normalized()
+	var sun_strength := 1.0 - smoothstep(1.6, 2.0, _sky_stage)
+	var moon_strength := smoothstep(1.8, 2.15, _sky_stage) * 0.56
+	var horizon := _stage_color(SKY_HORIZON_COLORS, _sky_stage)
+	_sky_material.set_shader_parameter("sky_top_color", _stage_color(SKY_TOP_COLORS, _sky_stage))
+	_sky_material.set_shader_parameter("sky_mid_color", _stage_color(SKY_MID_COLORS, _sky_stage))
+	_sky_material.set_shader_parameter("horizon_color", horizon)
+	_sky_material.set_shader_parameter("sun_color", Color("fff2cb").lerp(Color("ffca83"), smoothstep(0.75, 1.25, course_progress)))
+	_sky_material.set_shader_parameter("sun_direction", sun_direction)
+	_sky_material.set_shader_parameter("sun_strength", sun_strength)
+	_sky_material.set_shader_parameter("moon_direction", moon_direction)
+	_sky_material.set_shader_parameter("moon_strength", moon_strength)
+	_world_environment.ambient_light_color = _stage_color(AMBIENT_COLORS, _sky_stage)
+	_world_environment.ambient_light_energy = _stage_value(AMBIENT_ENERGIES, _sky_stage)
+	_world_environment.fog_light_color = horizon
+	_key_light.light_color = _stage_color(KEY_LIGHT_COLORS, _sky_stage)
+	_key_light.light_energy = _stage_value(KEY_LIGHT_ENERGIES, _sky_stage)
+	_key_light.look_at(_key_light.global_position - sun_direction.lerp(moon_direction, smoothstep(1.5, 2.2, _sky_stage)).normalized(), Vector3.UP)
+	_moon_glow.light_energy = moon_strength
+	_moon_glow.look_at(_moon_glow.global_position - moon_direction, Vector3.UP)
+	_darkness.color = Color(0.01, 0.015, 0.04, _stage_value(DARKNESS_ALPHAS, _sky_stage))
+
+
 func _build_world() -> void:
 	var environment := WorldEnvironment.new()
-	environment.name = "Night Environment"
+	environment.name = "Time of Day Environment"
 	var resource := Environment.new()
+	_world_environment = resource
 	var horizon_color := Color("12122c")
 	var sky_material := ShaderMaterial.new()
+	_sky_material = sky_material
 	sky_material.shader = NightSkyShader
 	sky_material.set_shader_parameter("sky_top_color", Color("08091b"))
 	sky_material.set_shader_parameter("horizon_color", horizon_color)
 	var night_sky := Sky.new()
 	night_sky.sky_material = sky_material
+	night_sky.process_mode = Sky.PROCESS_MODE_REALTIME
 	resource.background_mode = Environment.BG_SKY
 	resource.sky = night_sky
 	resource.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
@@ -633,6 +706,7 @@ func _build_world() -> void:
 	night_layer.name = "Night Tint"
 	night_layer.layer = 1
 	var darkness := ColorRect.new()
+	_darkness = darkness
 	darkness.name = "Full Screen Darkness"
 	darkness.set_anchors_preset(Control.PRESET_FULL_RECT)
 	darkness.color = Color(0.01, 0.015, 0.04, 0.22)
@@ -651,7 +725,8 @@ func _build_world() -> void:
 	vignette_layer.add_child(vignette)
 	add_child(vignette_layer)
 	var light := DirectionalLight3D.new()
-	light.name = "Moonlit Contact Shadows"
+	_key_light = light
+	light.name = "Time of Day Contact Shadows"
 	light.rotation_degrees = Vector3(-35.0, -20.0, 0.0)
 	light.light_color = Color("b5bbff")
 	light.light_energy = .2
@@ -665,6 +740,7 @@ func _build_world() -> void:
 	_halo_quad = QuadMesh.new()
 	_halo_quad.size = Vector2.ONE
 	var moon_glow := DirectionalLight3D.new()
+	_moon_glow = moon_glow
 	moon_glow.name = "Moon Glow"
 	moon_glow.rotation_degrees = Vector3(-8.0, 215.0, 0.0)
 	moon_glow.light_color = Color("eed4dcff")

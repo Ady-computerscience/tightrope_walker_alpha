@@ -29,6 +29,84 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: three bird models were not created")
 		quit(1)
 		return true
+	var sky: ShaderMaterial = game.get("_sky_material")
+	if sky == null or sky.get_shader_parameter("sky_top_color") != Color("2377c9"):
+		printerr("FAIL: the first crossing did not start under a blue daytime sky")
+		quit(1)
+		return true
+	var high_sun: Vector3 = sky.get_shader_parameter("sun_direction")
+	var atmosphere_rules: TightropeRules = game.get("rules")
+	game.set("visual_z", Rules.step_z(1, Rules.STEPS_PER_TOWER - 1))
+	game.call("_update_atmosphere", 0.0)
+	var before_second_tower: Vector3 = sky.get_shader_parameter("sun_direction")
+	atmosphere_rules.tower = 2
+	game.call("_update_atmosphere", 0.1)
+	if not (sky.get_shader_parameter("sun_direction") as Vector3).is_equal_approx(before_second_tower):
+		printerr("FAIL: the sun jumped when the last step toward tower two began")
+		quit(1)
+		return true
+	game.set("visual_z", Rules.step_z(1, Rules.STEPS_PER_TOWER))
+	game.call("_update_atmosphere", 0.0)
+	var low_sun: Vector3 = sky.get_shader_parameter("sun_direction")
+	if low_sun.y >= before_second_tower.y or before_second_tower.y >= high_sun.y:
+		printerr("FAIL: the sun did not descend during the first crossing")
+		quit(1)
+		return true
+	game.call("_update_atmosphere", 2.0)
+	if sky.get_shader_parameter("sky_mid_color") != Color("e87ca4"):
+		printerr("FAIL: the second crossing did not become sunset")
+		quit(1)
+		return true
+	game.set("visual_z", Rules.step_z(2, Rules.STEPS_PER_TOWER - 1))
+	game.call("_update_atmosphere", 0.0)
+	var before_third_tower: Vector3 = sky.get_shader_parameter("sun_direction")
+	atmosphere_rules.tower = 3
+	game.call("_update_atmosphere", 0.1)
+	if not (sky.get_shader_parameter("sun_direction") as Vector3).is_equal_approx(before_third_tower):
+		printerr("FAIL: the sun jumped when the last step toward tower three began")
+		quit(1)
+		return true
+	game.set("visual_z", Rules.step_z(2, Rules.STEPS_PER_TOWER))
+	game.call("_update_atmosphere", 0.0)
+	var set_sun: Vector3 = sky.get_shader_parameter("sun_direction")
+	if set_sun.y >= 0.0:
+		printerr("FAIL: the sun did not set below the horizon")
+		quit(1)
+		return true
+	game.call("_update_atmosphere", 2.0)
+	var low_moon: Vector3 = sky.get_shader_parameter("moon_direction")
+	if sky.get_shader_parameter("sky_mid_color") != Color("755fba"):
+		printerr("FAIL: the third crossing did not become dusk")
+		quit(1)
+		return true
+	game.set("visual_z", Rules.step_z(3, Rules.STEPS_PER_TOWER - 1))
+	game.call("_update_atmosphere", 0.0)
+	var before_fourth_tower: Vector3 = sky.get_shader_parameter("moon_direction")
+	atmosphere_rules.tower = 4
+	game.call("_update_atmosphere", 0.1)
+	if not (sky.get_shader_parameter("moon_direction") as Vector3).is_equal_approx(before_fourth_tower):
+		printerr("FAIL: the moon jumped when the last step toward tower four began")
+		quit(1)
+		return true
+	game.set("visual_z", Rules.step_z(3, Rules.STEPS_PER_TOWER))
+	game.call("_update_atmosphere", 0.0)
+	var rising_moon: Vector3 = sky.get_shader_parameter("moon_direction")
+	if rising_moon.y <= low_moon.y:
+		printerr("FAIL: the moon did not rise during the third crossing")
+		quit(1)
+		return true
+	game.call("_update_atmosphere", 2.0)
+	game.set("visual_z", Rules.step_z(4, Rules.STEPS_PER_TOWER))
+	game.call("_update_atmosphere", 0.0)
+	var high_moon: Vector3 = sky.get_shader_parameter("moon_direction")
+	if sky.get_shader_parameter("sky_top_color") != Color("08091b") or high_moon.y <= rising_moon.y:
+		printerr("FAIL: the final crossing did not keep the night sky and rising moon")
+		quit(1)
+		return true
+	atmosphere_rules.tower = 1
+	game.set("visual_z", Rules.step_z(1, 0))
+	game.set("_sky_stage", 0.0)
+	game.call("_update_atmosphere", 0.0)
 	for bird in bird_models:
 		var bird_animation := bird.find_child("AnimationPlayer", true, false) as AnimationPlayer
 		if bird_animation == null or not bird_animation.has_animation("australasian_swamphen_fly") or bird_animation.current_animation != "australasian_swamphen_fly" or bird_animation.get_animation("australasian_swamphen_fly").loop_mode != Animation.LOOP_LINEAR:
