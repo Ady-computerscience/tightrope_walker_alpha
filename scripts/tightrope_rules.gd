@@ -131,6 +131,7 @@ func update(delta: float, lean: float) -> Array[Dictionary]:
 			if bird_gust_timer > 0.0:
 				bird_gust_timer = maxf(0.0, bird_gust_timer - dt)
 				stage_push -= bird_dir * BIRD_GUST_PUSH
+			var bird_had_time := bird_timer > 0.0
 			bird_timer -= dt
 			if bird_phase == "rest" and bird_timer <= 0.0:
 				bird_phase = "approach"
@@ -145,9 +146,9 @@ func update(delta: float, lean: float) -> Array[Dictionary]:
 				bird_timer = BIRD_WARN
 				events.append({"type": "birds_arrived", "dir": bird_dir})
 			elif bird_phase == "warn":
-				if bird_response == 0 and absf(lean) > 0.5:
+				if bird_had_time and bird_response == 0 and absf(lean) > 0.5:
 					bird_response = 1 if lean > 0.0 else -1
-				if bird_timer <= 0.0:
+				if bird_response != 0 or bird_timer <= 0.0:
 					bird_phase = "rest"
 					bird_timer = BIRD_REST
 					bird_gust_timer = BIRD_GUST_DURATION

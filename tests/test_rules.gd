@@ -117,26 +117,32 @@ func _test_birds() -> void:
 	run.bird_timer = 0.0
 	events = run.update(1.0 / 60.0, 0.0)
 	_check(run.bird_phase == "warn" and is_equal_approx(run.bird_timer, 1.0) and events.size() == 1 and events[0]["type"] == "birds_arrived", "one-second reaction countdown starts when birds arrive")
-	run.update(1.0 / 60.0, -float(run.bird_dir))
-	_check(run.bird_response == -run.bird_dir and is_zero_approx(run.bird_gust_timer), "wrong response is recorded without an early gust")
-	run.bird_timer = 0.0
+	run.bird_timer = 0.5
 	run.tilt_vel = 0.0
-	events = run.update(1.0 / 60.0, 0.0)
+	events = run.update(1.0 / 60.0, -float(run.bird_dir))
+	_check(run.bird_response == -run.bird_dir and run.bird_phase == "rest" and is_equal_approx(run.bird_timer, Rules.BIRD_REST), "wrong response ends and resets countdown immediately")
 	_check(run.state == "falling" and run.fall_dir == -run.bird_dir and events.back().get("reason") == "birds", "wrong lean falls in gust direction")
-	_check(events.any(func(event: Dictionary) -> bool: return event["type"] == "bird_gust" and event["dir"] == -run.bird_dir), "gust triggers after wrong response countdown")
+	_check(events.any(func(event: Dictionary) -> bool: return event["type"] == "bird_gust" and event["dir"] == -run.bird_dir), "gust triggers immediately on wrong response")
 	_check(run.tilt_vel * run.bird_dir < 0.0, "bird gust pushes opposite the center bird")
 	var correct := Rules.new(5)
 	correct.tower = 2
 	correct.bird_phase = "warn"
 	correct.bird_timer = Rules.BIRD_WARN
 	correct.bird_dir = 1
-	correct.update(1.0 / 60.0, 1.0)
-	_check(correct.bird_response == 1 and correct.state == "walking" and is_zero_approx(correct.bird_gust_timer), "correct lean is recorded during reaction window")
-	correct.bird_timer = 0.0
+	for tick in 5:
+		correct.update(0.1, 0.0)
+	_check(correct.bird_phase == "warn" and is_equal_approx(correct.bird_timer, 0.5) and is_zero_approx(correct.bird_gust_timer), "no gust before a half-second response")
 	correct.tilt_vel = 0.4
 	events = correct.update(1.0 / 60.0, 1.0)
-	_check(correct.state == "walking" and correct.bird_phase == "rest" and correct.bird_gust_timer > 0.0 and correct.tilt_vel < 0.0, "correct lean survives opposite-direction gust")
+	_check(correct.bird_response == 1 and correct.state == "walking" and correct.bird_phase == "rest" and is_equal_approx(correct.bird_timer, Rules.BIRD_REST) and correct.bird_gust_timer > 0.0 and correct.tilt_vel < 0.0, "half-second response resets countdown and survives immediate gust")
 	_check(events.any(func(event: Dictionary) -> bool: return event["type"] == "birds_pass") and events.any(func(event: Dictionary) -> bool: return event["type"] == "bird_gust" and event["dir"] == -1), "success emits pass and gust events")
+	var last_frame := Rules.new(7)
+	last_frame.tower = 2
+	last_frame.bird_phase = "warn"
+	last_frame.bird_timer = 0.01
+	last_frame.bird_dir = -1
+	last_frame.update(1.0 / 60.0, -1.0)
+	_check(last_frame.state == "walking" and last_frame.bird_response == -1 and last_frame.bird_gust_timer > 0.0, "lean registered in the final countdown frame triggers the gust")
 	correct.update(1.0 / 60.0, 1.0)
 	_check(correct.push < 0.0 and correct.bird_gust_timer < Rules.BIRD_GUST_DURATION, "bird gust continues briefly after countdown")
 	var idle := Rules.new(6)
