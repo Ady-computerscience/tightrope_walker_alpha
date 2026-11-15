@@ -155,8 +155,8 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: startup control hint expired before the first step")
 		quit(1)
 		return true
-	if not _has_key_action("skip_intro", KEY_SPACE) or not _has_key_action("release", KEY_SPACE):
-		printerr("FAIL: Space is not mapped to intro skip and in-game release")
+	if not _has_key_action("skip_intro", KEY_SPACE) or not _has_key_action("skip_fall", KEY_SPACE) or not _has_key_action("release", KEY_SPACE):
+		printerr("FAIL: Space is not mapped to intro skip, fall skip, and in-game release")
 		quit(1)
 		return true
 	var intro_camera_position := camera.position
@@ -508,10 +508,43 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: checkpoint test did not trigger a fall")
 		quit(1)
 		return true
-	for tick in 18:
+	for tick in 12:
 		game.call("_process", 0.1)
+	var falling_walker: Node3D = game.get("walker")
+	if run.state != "falling" or falling_walker.position.y >= 37.0:
+		printerr("FAIL: stuntman stopped falling high above the street")
+		quit(1)
+		return true
+	for tick in 30:
+		if game.get("fall_ready_to_respawn"):
+			break
+		game.call("_process", 0.1)
+	var street_mesh := game.get_node("City Ground/Asphalt Street") as MeshInstance3D
+	var street_top: float = street_mesh.position.y + (street_mesh.mesh as BoxMesh).size.y * 0.5
+	if run.state != "falling" or not game.get("fall_ready_to_respawn") or falling_walker.position.y <= street_top or falling_walker.position.y > street_top + 1.0:
+		printerr("FAIL: stuntman did not reach just above the street before respawn: state=%s ready=%s feet=%f street=%f" % [run.state, game.get("fall_ready_to_respawn"), falling_walker.position.y, street_top])
+		quit(1)
+		return true
+	game.call("_process", 0.1)
 	if run.state != "walking" or run.tower != 2 or run.on_rope or not is_equal_approx(game.get("visual_z"), Rules.step_z(2, 0)):
 		printerr("FAIL: fall did not respawn on last reached rooftop: state=%s tower=%d z=%f elapsed=%f" % [run.state, run.tower, game.get("visual_z"), game.get("fall_elapsed")])
+		quit(1)
+		return true
+	run.step = 1
+	run.reach_rope()
+	run.tilt = 0.99
+	run.tilt_vel = 2.0
+	run.update(1.0 / 60.0, 0.0)
+	game.call("_process", 0.1)
+	if run.state != "falling" or game.get("fall_ready_to_respawn"):
+		printerr("FAIL: second fall was not active before the Space shortcut")
+		quit(1)
+		return true
+	Input.action_press("skip_fall")
+	game.call("_process", 0.1)
+	Input.action_release("skip_fall")
+	if run.state != "walking" or run.tower != 2 or run.on_rope or not is_equal_approx(game.get("visual_z"), Rules.step_z(2, 0)) or not is_equal_approx(falling_walker.position.y, 45.0):
+		printerr("FAIL: Space did not immediately respawn at the checkpoint")
 		quit(1)
 		return true
 	hud.call("_process", 11.0)

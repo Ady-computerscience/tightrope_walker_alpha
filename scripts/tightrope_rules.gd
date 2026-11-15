@@ -5,6 +5,7 @@ extends RefCounted
 const TOWER_COUNT := 4
 const STEPS_PER_TOWER := 9
 const TOWER_SPACING := 62.0
+const ROOFTOP_START_OFFSET := 6.5
 const ROPE_START_OFFSET := 7.0
 const ROPE_LENGTH := 48.0
 const STEP_COOLDOWN := 0.45
@@ -94,9 +95,9 @@ static func tower_z(tower_number: int) -> float:
 static func step_z(tower_number: int, step_number: int) -> float:
 	var z := tower_z(tower_number)
 	if step_number <= 0:
-		return z - 4.0
+		return z - ROOFTOP_START_OFFSET
 	if step_number >= STEPS_PER_TOWER:
-		return tower_z(tower_number + 1) - 4.0
+		return tower_z(tower_number + 1) - ROOFTOP_START_OFFSET
 	return z - 8.0 - (step_number - 1) * (46.0 / (STEPS_PER_TOWER - 2))
 
 

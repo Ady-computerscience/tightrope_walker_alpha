@@ -4,7 +4,7 @@ A Godot 4.7 single-player port of the supplied Roblox game. The balance and stag
 
 ## Play
 
-Open `project.godot` in Godot 4.7 and run the project. Press **W** to step with the left foot or **O** to step with the right foot; lean with **Q/P**. Release tension with **Space** or **E**, pause with **Escape**, and restart with **R**. The gamepad step button alternates feet automatically.
+Open `project.godot` in Godot 4.7 and run the project. Press **W** to step with the left foot or **O** to step with the right foot; lean with **Q/P**. Release tension with **Space** or **E**, pause with **Escape**, and restart with **R**. During a fall, press **Space** to respawn immediately. The gamepad step button alternates feet automatically.
 
 The control hint appears at the bottom only when the game starts or is explicitly restarted. It stays visible until the first successful step, then hides ten seconds later.
 

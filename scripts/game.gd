@@ -12,6 +12,9 @@ const INTRO_SKIP_DURATION := 0.65
 const INTRO_START_POSITION := Vector3(18.0, 64.0, -250.0)
 const INTRO_START_LOOK := Vector3(0.0, 52.0, -270.0)
 const FEET_Y := 45.0
+const STREET_SURFACE_Y := -12.0
+const RESPAWN_FEET_Y := STREET_SURFACE_Y + 0.8
+const FALL_GRAVITY := 26.0
 const ROPE_Y := 44.87
 const STATIC_SAG := 0.25
 const LOAD_SAG := 0.9
@@ -53,15 +56,18 @@ var _snow_gust_active := false
 var _bird_snow_remaining := 0.0
 var _bird_snow_direction := 0
 var _bird_snow_burst_pending := false
-var visual_z := -4.0
-var step_from := -4.0
-var step_to := -4.0
+var visual_z := Rules.step_z(1, 0)
+var step_from := Rules.step_z(1, 0)
+var step_to := Rules.step_z(1, 0)
 var step_elapsed := 0.0
 var step_duration := 0.0
 var step_result := ""
 var last_step_foot := ""
 var has_taken_first_step := false
 var fall_elapsed := 0.0
+var fall_start_position := Vector3.ZERO
+var fall_started := false
+var fall_ready_to_respawn := false
 var intro_elapsed := 0.0
 var intro_skip_elapsed := 0.0
 var intro_skip_from_position := Vector3.ZERO
@@ -136,18 +142,24 @@ func _process(delta: float) -> void:
 					"bird_gust": _queue_bird_snow_burst(int(event["dir"]))
 					"gust_pass": hud.show_toast("PASS", 1.0)
 					"fall":
-						fall_elapsed = 0.0
+						_start_fall()
 						step_duration = 0.0
 						hud.show_toast("MISS", 1.0)
 						if walker_animation != null and walker_animation.has_animation("die"):
 							walker_animation.play("die")
 		if rules.state == "falling":
-			fall_elapsed += dt
-			if fall_elapsed >= 1.7:
+			if not fall_started:
+				_start_fall()
+			if fall_ready_to_respawn or (fall_elapsed > 0.0 and Input.is_action_just_pressed("skip_fall")):
 				rules.respawn()
 				visual_z = Rules.step_z(rules.tower, 0)
+				fall_elapsed = 0.0
+				fall_started = false
+				fall_ready_to_respawn = false
 				_play_walker_animation("idle")
 				_announce_tower("Try again")
+			else:
+				fall_elapsed += dt
 	_update_step(dt)
 	_update_traffic(dt)
 	_update_walker(dt)
@@ -214,6 +226,8 @@ func _restart() -> void:
 	_play_walker_animation("idle")
 	step_duration = 0.0
 	fall_elapsed = 0.0
+	fall_started = false
+	fall_ready_to_respawn = false
 	camera_wind_sway = 0.0
 	camera_bird_gust_remaining = 0.0
 	hud.set_paused(false)
@@ -229,6 +243,13 @@ func _restart() -> void:
 	hud.show_caption("")
 	hud.show_control_hint()
 	_announce_tower()
+
+
+func _start_fall() -> void:
+	fall_elapsed = 0.0
+	fall_start_position = walker.position
+	fall_started = true
+	fall_ready_to_respawn = false
 
 
 func _stargaze() -> void:
@@ -295,8 +316,13 @@ func _update_walker(_dt: float) -> void:
 		if rules.stage_kind() == "Sway":
 			feet.x += rules.sway * 1.6 * sin(PI * s)
 	if rules.state == "falling":
-		feet.y -= minf(8.0, fall_elapsed * fall_elapsed * 11.0)
-		feet.x += rules.fall_dir * fall_elapsed * 3.0
+		if not fall_started:
+			_start_fall()
+		var falling_y := fall_start_position.y - 0.5 * FALL_GRAVITY * fall_elapsed * fall_elapsed
+		feet.y = maxf(RESPAWN_FEET_Y, falling_y)
+		feet.x = fall_start_position.x + rules.fall_dir * fall_elapsed * 3.0
+		if falling_y <= RESPAWN_FEET_Y:
+			fall_ready_to_respawn = true
 	walker.position = feet
 	walker.rotation.z = -rules.tilt * deg_to_rad(30.0)
 	pole.rotation.z = PI * 0.5 + rules.tilt * deg_to_rad(12.0)
@@ -777,7 +803,7 @@ func _build_city_ground() -> void:
 	var ground := Node3D.new()
 	ground.name = "City Ground"
 	add_child(ground)
-	var street := _city_box(ground, Vector3(0.0, -12.5, -190.0), Vector3(78.0, 1.0, 500.0), Color("252a39"))
+	var street := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y - 0.5, -190.0), Vector3(78.0, 1.0, 500.0), Color("252a39"))
 	street.name = "Asphalt Street"
 	for side_index in 2:
 		var side := -1.0 if side_index == 0 else 1.0
@@ -863,6 +889,7 @@ func _install_input_actions() -> void:
 	_add_key("step_left", KEY_W)
 	_add_key("step_right", KEY_O)
 	_add_key("skip_intro", KEY_SPACE)
+	_add_key("skip_fall", KEY_SPACE)
 	_add_key("release", KEY_SPACE)
 	_add_key("release", KEY_E)
 	_add_key("pause_run", KEY_ESCAPE)
