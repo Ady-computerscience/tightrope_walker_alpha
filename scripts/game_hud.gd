@@ -14,16 +14,18 @@ const WireGaugeScene := preload("res://scripts/wire_tension_gauge.gd")
 const MINT := Color("7ee8ac")
 const PANEL := Color("211e36e8")
 const MUTED := Color("b7b5c9")
-const CONTROL_HINT_SECONDS := 10.0
 const COUNTDOWN_BAR_HEIGHT := 4.0
 const TOP_BANNER_SIDE_MARGIN := 24.0
 const TOP_BANNER_TOP_MARGIN := 16.0
-const TOP_BANNER_HEIGHT := 116.0
+const TOP_BANNER_HEIGHT := 174.0
 
 var _progress: Label
 var _stage: Label
 var _run_timer: Label
 var _cue: Label
+var _step_control: Label
+var _lean_control: Label
+var _space_control: Label
 var _balance: ProgressBar
 var _wire_gauge: WireTensionGauge
 var _wire_gauge_panel: PanelContainer
@@ -41,32 +43,11 @@ var _win: PanelContainer
 var _win_text: Label
 var _paused: PanelContainer
 var _scrim: ColorRect
-var _control_hint: PanelContainer
-var _control_hint_elapsed := 0.0
-var _hint_countdown_started := false
 var _tower_marks: Array[Panel] = []
 
 
 func _ready() -> void:
 	_build()
-
-
-func _process(delta: float) -> void:
-	if _control_hint.visible and _hint_countdown_started:
-		_control_hint_elapsed += delta
-		if _control_hint_elapsed >= CONTROL_HINT_SECONDS:
-			_control_hint.hide()
-
-
-func show_control_hint() -> void:
-	_control_hint.show()
-	_control_hint_elapsed = 0.0
-	_hint_countdown_started = false
-
-
-func start_control_hint_countdown() -> void:
-	_hint_countdown_started = true
-	_control_hint_elapsed = 0.0
 
 
 func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, cue: String, tension: float = 0.0, run_seconds: float = 0.0) -> void:
@@ -83,6 +64,11 @@ func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, c
 	for index in _tower_marks.size():
 		var style := _tower_marks[index].get_theme_stylebox("panel") as StyleBoxFlat
 		style.bg_color = GOLD if index < tower else Color("5b586f")
+
+
+func show_space_control(message: String) -> void:
+	_space_control.text = message
+	_space_control.visible = not message.is_empty()
 
 
 func show_countdown_bar(screen_position: Vector2, width: float, remaining_fraction: float) -> void:
@@ -125,11 +111,12 @@ func hide_countdown_bar() -> void:
 	_countdown_track.hide()
 
 
-func show_toast(message: String, duration: float = 3.0) -> void:
+func show_toast(message: String, duration: float = 3.0, font_size: int = 18) -> void:
 	_toast_generation += 1
 	var generation := _toast_generation
 	if _toast_tween != null and _toast_tween.is_running():
 		_toast_tween.kill()
+	_toast.add_theme_font_size_override("font_size", font_size)
 	_toast.text = message
 	_toast.visible = true
 	_toast.modulate.a = 0.0
@@ -142,6 +129,14 @@ func show_toast(message: String, duration: float = 3.0) -> void:
 			_toast_tween.tween_property(_toast, "modulate:a", 0.0, 0.22)
 			_toast_tween.tween_callback(func() -> void: _toast.visible = false)
 	)
+
+
+func hide_toast() -> void:
+	_toast_generation += 1
+	if _toast_tween != null and _toast_tween.is_running():
+		_toast_tween.kill()
+	_toast.text = ""
+	_toast.hide()
 
 
 func show_caption(message: String) -> void:
@@ -223,6 +218,13 @@ func _build() -> void:
 	_cue = _label("Keep the pole level", 13, MINT)
 	_cue.clip_text = true
 	top_box.add_child(_cue)
+	_step_control = _label("W / O: step left/right", 12, MUTED)
+	top_box.add_child(_step_control)
+	_lean_control = _label("Q / P: lean left / right", 12, MUTED)
+	top_box.add_child(_lean_control)
+	_space_control = _label("", 12, MUTED)
+	top_box.add_child(_space_control)
+	_space_control.hide()
 
 	var gauge_panel := PanelContainer.new()
 	gauge_panel.name = "Wire Tension Gauge"
@@ -273,27 +275,6 @@ func _build() -> void:
 	_wire_countdown_fill.add_theme_stylebox_override("panel", _wire_countdown_fill_style)
 	_wire_countdown_track.add_child(_wire_countdown_fill)
 	_wire_countdown_track.hide()
-
-	_control_hint = PanelContainer.new()
-	_control_hint.name = "Control Hint"
-	_control_hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	_control_hint.offset_left = -300.0
-	_control_hint.offset_right = 300.0
-	_control_hint.offset_top = -70.0
-	_control_hint.offset_bottom = -12.0
-	_control_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_control_hint.add_theme_stylebox_override("panel", _panel_style(12))
-	root.add_child(_control_hint)
-	var hint_text := RichTextLabel.new()
-	hint_text.bbcode_enabled = true
-	hint_text.text = "[center][b]Step left/right:[/b] W / O      [b]Lean left/right:[/b] Q / P[/center]"
-	hint_text.fit_content = true
-	hint_text.scroll_active = false
-	hint_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hint_text.add_theme_font_size_override("normal_font_size", 15)
-	hint_text.add_theme_color_override("default_color", CREAM)
-	_control_hint.add_child(hint_text)
-	_control_hint.hide()
 
 	_caption = _label("", 22, CREAM)
 	_caption.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)

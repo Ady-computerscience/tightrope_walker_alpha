@@ -81,13 +81,6 @@ const TRAFFIC_SPAWN_Z := [
 	-407.0, -390.0, -347.0, -312.0, -269.0, -243.0,
 	-198.0, -160.0, -119.0, -91.0, -41.0, -18.0,
 ]
-const STORIES := [
-	"The skyline waits ahead. Find your balance and take the first step.",
-	"Even the birds doubt you. Let them watch you prove them wrong.",
-	"Halfway across. The rope knows your weight now.",
-	"One last sway. The stars are leaning in to see.",
-]
-
 var rules: TightropeRules
 var hud: GameHUD
 var camera: Camera3D
@@ -170,8 +163,6 @@ func _ready() -> void:
 	hud.replay_requested.connect(_restart)
 	hud.stargaze_requested.connect(_stargaze)
 	hud.pause_requested.connect(_toggle_pause)
-	hud.show_caption("Beyond the horizon, the stars gather every night. Press Space to skip.")
-	hud.show_control_hint()
 
 
 func _process(delta: float) -> void:
@@ -208,8 +199,6 @@ func _process(delta: float) -> void:
 		if rules.state == "walking":
 			for event in rules.update(dt, _lean_input(), _gust_response_input()):
 				match event["type"]:
-					"birds": hud.show_toast("Birds incoming!")
-					"birds_arrived": hud.show_toast("Lean toward the middle bird")
 					"birds_pass": hud.show_toast("PASS", 1.0)
 					"bird_gust": _queue_bird_snow_burst(int(event["dir"]))
 					"gust_pass": hud.show_toast("PASS", 1.0)
@@ -229,7 +218,7 @@ func _process(delta: float) -> void:
 				fall_started = false
 				fall_ready_to_respawn = false
 				_play_walker_animation("idle")
-				_announce_tower("Try again")
+				_show_tower_title()
 			else:
 				fall_elapsed += dt
 	_update_step(dt)
@@ -272,7 +261,6 @@ func _step(foot: String = "") -> void:
 		return
 	if not has_taken_first_step:
 		has_taken_first_step = true
-		hud.start_control_hint_countdown()
 	if foot.is_empty():
 		foot = "right" if last_step_foot == "left" else "left"
 	last_step_foot = foot
@@ -304,8 +292,7 @@ func _start_intro_skip() -> void:
 
 func _finish_intro() -> void:
 	mode = "walking"
-	hud.show_caption("")
-	_announce_tower()
+	_show_tower_title()
 
 
 func _restart() -> void:
@@ -324,6 +311,7 @@ func _restart() -> void:
 	camera_bird_gust_remaining = 0.0
 	hud.set_paused(false)
 	hud.hide_win()
+	hud.hide_toast()
 	hud.hide_countdown_bar()
 	hud.hide_wire_countdown_bar()
 	gust_flag.hide()
@@ -336,8 +324,7 @@ func _restart() -> void:
 	_sky_stage = 0.0
 	_update_atmosphere(0.0)
 	hud.show_caption("")
-	hud.show_control_hint()
-	_announce_tower()
+	_show_tower_title()
 
 
 func _start_fall() -> void:
@@ -361,6 +348,7 @@ func _toggle_pause() -> void:
 		return
 	paused = not paused
 	hud.set_paused(paused)
+	_update_hud()
 
 
 func _lean_input() -> float:
@@ -393,7 +381,7 @@ func _update_step(dt: float) -> void:
 			rules.reach_rope()
 		if step_result == "tower":
 			rules.reach_tower()
-			_announce_tower()
+			_show_tower_title()
 		elif step_result == "won":
 			best_time = minf(best_time, rules.finish_time)
 			hud.show_win(rules.finish_time, rules.falls, best_time)
@@ -644,30 +632,34 @@ func _update_camera(dt: float) -> void:
 
 func _update_hud() -> void:
 	var cue := "Keep the pole level"
-	if not rules.on_rope:
-		cue = "W / O: step onto the rope"
-	else:
+	if rules.state == "falling":
+		cue = "Falling"
+	elif rules.on_rope:
 		match rules.stage_kind():
 			"Wind": cue = "Watch for the flag"
-			"Birds": cue = "Center bird: Q / P  %.1fs" % rules.bird_timer if rules.bird_phase == "warn" else ("Bird gust!" if rules.bird_gust_timer > 0.0 else ("Birds incoming" if rules.bird_phase == "approach" else "Watch for the birds"))
-			"Tension": cue = "Tension: %.0f%%  •  Space to release" % [rules.tension * 100.0]
+			"Birds": cue = "Center bird: Q / P  %.1fs" % rules.bird_timer if rules.bird_phase == "warn" else ("Bird gust!" if rules.bird_gust_timer > 0.0 else ("" if rules.bird_phase == "approach" else "Watch for the birds"))
+			"Tension": cue = "Tension: %.0f%%" % [rules.tension * 100.0]
 			"Sway":
 				if rules.bird_phase == "warn":
 					cue = "Center bird: Q / P  %.1fs" % rules.bird_timer
 				elif rules.wind_phase == "cue" or rules.wind_phase == "react":
 					cue = "Watch for the flag"
-				elif rules.bird_phase == "approach":
-					cue = "Birds incoming"
 				elif rules.bird_gust_timer > 0.0:
 					cue = "Bird gust!"
 				else:
-					cue = "Sway: %.0f%%  •  Space: release wire" % [rules.sway * 100.0]
+					cue = "Sway: %.0f%%" % [rules.sway * 100.0]
 	hud.show_status(rules.tower, rules.step, Rules.STEPS_PER_TOWER, rules.stage_kind(), rules.tilt, cue, rules.tension, rules.time)
+	var space_action := ""
+	if mode == "walking" and not paused:
+		if rules.state == "falling" and fall_elapsed > 0.0:
+			space_action = "SPACE: respawn"
+		elif rules.state == "walking" and rules.on_rope and rules.tension_enabled() and rules.time - rules.last_release_at >= Rules.RELEASE_COOLDOWN:
+			space_action = "SPACE: release wire tension"
+	hud.show_space_control(space_action)
 
 
-func _announce_tower(subtitle: String = "") -> void:
-	var text: String = subtitle if not subtitle.is_empty() else STORIES[rules.tower - 1]
-	hud.show_toast("Tower %d: %s" % [rules.tower, text])
+func _show_tower_title() -> void:
+	hud.show_toast("TOWER %d: %s" % [rules.tower, rules.stage_kind()], 2.5, 34)
 
 
 func _stage_color(colors: Array, stage: float) -> Color:

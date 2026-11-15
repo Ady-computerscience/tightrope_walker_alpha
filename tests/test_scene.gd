@@ -147,6 +147,11 @@ func _process(_delta: float) -> bool:
 	bird_rules.bird_dir = 1
 	bird_rules.bird_dirs = [-1, 1, -1]
 	game.call("_update_birds")
+	game.call("_update_hud")
+	if (game.get("hud").get("_cue") as Label).text.contains("Birds incoming"):
+		printerr("FAIL: bird approach displayed the removed warning text")
+		quit(1)
+		return true
 	var center_bird: Node3D = bird_models[1]
 	var hover_position: Vector3 = game.get("walker").position + Vector3(0.0, 3.5, -5.0)
 	var camera: Camera3D = game.get("camera")
@@ -303,14 +308,20 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: wire tension gauge stayed visible outside the tension stage")
 		quit(1)
 		return true
-	var hint: PanelContainer = hud.get("_control_hint")
-	if hint == null or not hint.visible or not is_equal_approx(hint.anchor_top, 1.0):
-		printerr("FAIL: control hint is not visible at the bottom on startup")
+	game.call("_update_hud")
+	var step_control: Label = hud.get("_step_control")
+	var lean_control: Label = hud.get("_lean_control")
+	var space_control: Label = hud.get("_space_control")
+	var cue: Label = hud.get("_cue")
+	var banner: PanelContainer = hud.get_child(0).get_node("Top Banner")
+	if not step_control.visible or step_control.text != "W / O: step left/right" or lean_control.text != "Q / P: lean left / right" or space_control.visible or step_control.get_global_rect().position.y <= cue.get_global_rect().position.y or lean_control.get_global_rect().position.y <= step_control.get_global_rect().position.y or lean_control.get_global_rect().end.y > banner.get_global_rect().end.y:
+		printerr("FAIL: permanent W / O and lean controls are missing or Space appears before it can be used")
 		quit(1)
 		return true
-	hud.call("_process", 30.0)
-	if not hint.visible:
-		printerr("FAIL: startup control hint expired before the first step")
+	var opening_caption: Label = hud.get("_caption")
+	var opening_toast: Label = hud.get("_toast")
+	if opening_caption.visible or opening_toast.visible or hud.get_child(0).get_node_or_null("Control Hint") != null:
+		printerr("FAIL: opening text or control hint appeared")
 		quit(1)
 		return true
 	if not _has_key_action("skip_intro", KEY_SPACE) or not _has_key_action("skip_fall", KEY_SPACE) or not _has_key_action("release", KEY_SPACE):
@@ -333,6 +344,10 @@ func _process(_delta: float) -> bool:
 		game.call("_process", 0.1)
 	if game.get("mode") != "walking" or not camera.position.is_equal_approx(start_view_position) or game.get("rules").step != 0 or game.get("has_taken_first_step"):
 		printerr("FAIL: intro skip did not land at the start without taking a step")
+		quit(1)
+		return true
+	if opening_caption.visible or not opening_toast.visible or opening_toast.text != "TOWER 1: Wind" or opening_toast.get_theme_font_size("font_size") != 34 or opening_toast.horizontal_alignment != HORIZONTAL_ALIGNMENT_CENTER or opening_toast.offset_top <= GameHUD.TOP_BANNER_TOP_MARGIN + GameHUD.TOP_BANNER_HEIGHT:
+		printerr("FAIL: stage one title was not centered below the HUD after the intro")
 		quit(1)
 		return true
 	var startup_rules: TightropeRules = game.get("rules")
@@ -439,13 +454,13 @@ func _process(_delta: float) -> bool:
 	startup_rules.last_step_at = startup_rules.time
 	game.call("_step", "left")
 	if game.get("has_taken_first_step"):
-		printerr("FAIL: cooldown press started control hint countdown")
+		printerr("FAIL: cooldown press counted as the first step")
 		quit(1)
 		return true
 	startup_rules.last_step_at = -10.0
 	game.call("_step", "left")
 	if not game.get("has_taken_first_step") or startup_rules.step != 1 or startup_rules.on_rope:
-		printerr("FAIL: first successful step did not start control hint countdown")
+		printerr("FAIL: first successful step did not advance the run")
 		quit(1)
 		return true
 	game.call("_update_step", 0.2)
@@ -458,21 +473,6 @@ func _process(_delta: float) -> bool:
 	game.call("_update_step", 0.2)
 	if not startup_rules.on_rope or not is_equal_approx(game.get("visual_z"), Rules.step_z(1, 1)):
 		printerr("FAIL: first step did not put the stuntman on the rope")
-		quit(1)
-		return true
-	hud.call("_process", 9.9)
-	if not hint.visible:
-		printerr("FAIL: control hint hid before ten seconds after first step")
-		quit(1)
-		return true
-	hud.call("_process", 0.2)
-	if hint.visible:
-		printerr("FAIL: control hint did not hide after ten seconds from first step")
-		quit(1)
-		return true
-	hud.call("_process", 30.0)
-	if hint.visible:
-		printerr("FAIL: control hint reappeared without a restart")
 		quit(1)
 		return true
 	game.call("_restart")
@@ -524,9 +524,8 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	game.call("_restart")
-	hud.call("_process", 11.0)
-	if not hint.visible or game.get("has_taken_first_step"):
-		printerr("FAIL: restarted round did not wait for its first step")
+	if opening_caption.visible or opening_toast.text != "TOWER 1: Wind" or game.get("has_taken_first_step"):
+		printerr("FAIL: restarted round did not show the stage one title")
 		quit(1)
 		return true
 	var towers := game.get_node_or_null("Rooftop Skyscrapers")
@@ -747,8 +746,8 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	game.call("_restart")
-	if not hint.visible or game.get("has_taken_first_step"):
-		printerr("FAIL: control hint did not reset after restart")
+	if opening_caption.visible or opening_toast.text != "TOWER 1: Wind" or game.get("has_taken_first_step"):
+		printerr("FAIL: restart did not show the stage one title")
 		quit(1)
 		return true
 	var run: TightropeRules = game.get("rules")
@@ -760,14 +759,13 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: next tower became checkpoint before landing")
 		quit(1)
 		return true
-	hud.call("_process", 10.1)
-	if hint.visible:
-		printerr("FAIL: restarted control hint did not expire after its first step")
-		quit(1)
-		return true
 	game.call("_update_step", 1.3)
 	if run.checkpoint_tower != 2 or run.on_rope:
 		printerr("FAIL: landing did not save tower two checkpoint")
+		quit(1)
+		return true
+	if opening_toast.text != "TOWER 2: Birds" or opening_toast.get_theme_font_size("font_size") != 34:
+		printerr("FAIL: tower two title did not appear at the checkpoint")
 		quit(1)
 		return true
 	run.tilt = 0.99
@@ -826,6 +824,10 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: second fall was not active before the Space shortcut")
 		quit(1)
 		return true
+	if not step_control.visible or not space_control.visible or space_control.text != "SPACE: respawn":
+		printerr("FAIL: falling HUD did not show the Space respawn prompt")
+		quit(1)
+		return true
 	Input.action_press("skip_fall")
 	game.call("_process", 0.1)
 	Input.action_release("skip_fall")
@@ -833,9 +835,12 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: Space did not immediately respawn at the checkpoint")
 		quit(1)
 		return true
-	hud.call("_process", 11.0)
-	if hint.visible or not game.get("has_taken_first_step"):
-		printerr("FAIL: control hint reappeared after fall respawn")
+	if not step_control.visible or space_control.visible:
+		printerr("FAIL: Space respawn prompt remained after landing")
+		quit(1)
+		return true
+	if opening_toast.text != "TOWER 2: Birds" or not game.get("has_taken_first_step"):
+		printerr("FAIL: checkpoint title did not appear after fall respawn")
 		quit(1)
 		return true
 	hud.show_win(25.0, 1, 25.0)
@@ -861,6 +866,20 @@ func _process(_delta: float) -> bool:
 	run.tension = Rules.TENSION_COUNTDOWN_START
 	game.call("_update_hud")
 	game.call("_update_reaction_timer")
+	if not step_control.visible or not space_control.visible or space_control.text != "SPACE: release wire tension" or space_control.get_global_rect().end.y > banner.get_global_rect().end.y:
+		printerr("FAIL: wire tension HUD did not show the Space release prompt")
+		quit(1)
+		return true
+	game.call("_toggle_pause")
+	if space_control.visible or not step_control.visible:
+		printerr("FAIL: Space release prompt remained available while paused")
+		quit(1)
+		return true
+	game.call("_toggle_pause")
+	if not space_control.visible:
+		printerr("FAIL: Space release prompt did not return after unpausing")
+		quit(1)
+		return true
 	var wire_timer_width := gauge_rect.size.x - 16.0
 	if not wire_timer.visible or (hud.get("_wire_gauge") as WireTensionGauge).displayed_tension < WireTensionGauge.YELLOW_END or not is_equal_approx(wire_timer.position.x + wire_timer.size.x * 0.5, gauge_rect.get_center().x) or not is_equal_approx(wire_timer.position.y, gauge_rect.end.y + 8.0) or not is_equal_approx(wire_timer.size.x, wire_timer_width) or not is_equal_approx(wire_timer_fill.size.x, wire_timer_width):
 		printerr("FAIL: wire countdown is not full-sized beneath the gauge")
@@ -895,14 +914,21 @@ func _process(_delta: float) -> bool:
 	run.wind_phase = "rest"
 	game.call("_release")
 	var toast: Label = hud.get("_toast")
+	game.call("_update_hud")
 	game.call("_update_reaction_timer")
-	if toast.text != "PASS" or not is_zero_approx(run.tension) or wire_timer.visible:
+	if toast.text != "PASS" or toast.get_theme_font_size("font_size") != 18 or not is_zero_approx(run.tension) or wire_timer.visible or space_control.visible:
 		printerr("FAIL: releasing wire tension did not show PASS and hide the countdown")
+		quit(1)
+		return true
+	run.time += Rules.RELEASE_COOLDOWN
+	game.call("_update_hud")
+	if not space_control.visible:
+		printerr("FAIL: Space release prompt did not return after cooldown")
 		quit(1)
 		return true
 	run.tension = 0.995
 	game.call("_process", 0.1)
-	if run.fall_reason != "snap" or toast.text != "FAIL" or wire_timer.visible:
+	if run.fall_reason != "snap" or toast.text != "FAIL" or wire_timer.visible or space_control.text != "SPACE: respawn":
 		printerr("FAIL: snapped wire tension did not show FAIL and clear its countdown")
 		quit(1)
 		return true
