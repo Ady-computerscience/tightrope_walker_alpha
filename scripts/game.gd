@@ -53,18 +53,24 @@ const AMBIENT_ENERGIES := [0.65, 0.43, 0.17, 0.10]
 const DARKNESS_ALPHAS := [0.0, 0.04, 0.17, 0.22]
 const FOG_DENSITIES := [0.28, 0.65, 0.88, 1.0]
 const FOG_DEPTH_BEGINS := [120.0, 80.0, 60.0, 45.0]
-const FOG_DEPTH_ENDS := [400.0, 340.0, 300.0, 260.0]
+const FOG_DEPTH_ENDS := [700.0, 570.0, 460.0, 400.0]
 const FOG_HEIGHT_DENSITIES := [0.012, 0.025, 0.034, 0.04]
 const LIT_SOURCE_GLOW_FACTORS := [0.04, 0.35, 0.72, 1.0]
 const STAGE_SKY_BLEND_SPEED := 0.8
 const ROOF_SPIKE_COLOR := Color("7c829e")
 const SNOW_LAYER_THICKNESS := 0.22
 const GROUND_SNOW_THICKNESS := 0.08
-const CITY_GROUND_FAR_Z := -680.0
-const CITY_GROUND_NEAR_Z := 60.0
+const STREET_WIDTH := 52.0
+const SIDEWALK_WIDTH := 9.0
+const SIDEWALK_CENTER_X := (STREET_WIDTH + SIDEWALK_WIDTH) * 0.5
+const SIDEWALK_SURFACE_Y := STREET_SURFACE_Y + 0.5 + GROUND_SNOW_THICKNESS
+const TRAFFIC_LANE_X := 13.0
+const CITY_GROUND_FAR_Z := -1140.0
+const CITY_GROUND_NEAR_Z := 300.0
+const CITY_GROUND_WIDTH := 500.0
 const CITY_GROUND_LENGTH := CITY_GROUND_NEAR_Z - CITY_GROUND_FAR_Z
 const CITY_GROUND_CENTER_Z := (CITY_GROUND_NEAR_Z + CITY_GROUND_FAR_Z) * 0.5
-const TRAFFIC_START_Z := CITY_GROUND_FAR_Z
+const TRAFFIC_START_Z := -680.0
 const TRAFFIC_END_Z := 50.0
 const TRAFFIC_SPAWN_Z := [
 	-635.0, -617.0, -568.0, -539.0, -493.0, -477.0,
@@ -1102,38 +1108,107 @@ func _build_cityscape() -> void:
 						_red_beacons.append({"bulb": bulb, "light": beacon_light, "halo": halo, "snow_glow": snow_glow, "cap_glow": cap_glow, "phase": phase})
 					else:
 						_queue_light_halo(city, beacon_position, Vector2(1.35, 1.35), halo_color)
+	_build_distant_skyline(city)
+
+
+func _build_distant_skyline(city: Node3D) -> void:
+	var skyline := Node3D.new()
+	skyline.name = "Distant Skyline"
+	city.add_child(skyline)
+	var skyline_rng := RandomNumberGenerator.new()
+	skyline_rng.seed = 81247
+	var wall_colors := [Color("30364b"), Color("394056"), Color("42475b"), Color("2c3347")]
+	var side_windows: Array[Transform3D] = []
+	var end_windows: Array[Transform3D] = []
+	for side in [-1.0, 1.0]:
+		for row in 3:
+			var distance := 115.0 + float(row) * 45.0
+			for index in 46:
+				var x: float = side * (distance + skyline_rng.randf_range(-6.0, 6.0))
+				var z := 215.0 - float(index) * 28.0 - float(row) * 8.0 + skyline_rng.randf_range(-5.0, 5.0)
+				var height := skyline_rng.randf_range(24.0, 65.0) + float(row) * 3.0
+				var width := skyline_rng.randf_range(15.0, 23.0)
+				var depth := skyline_rng.randf_range(14.0, 21.0)
+				_add_distant_building(skyline, x, z, width, depth, height, wall_colors[(index + row) % wall_colors.size()], side_windows, true)
+	for z in [270.0, -1110.0]:
+		for index in 19:
+			var x: float = -225.0 + float(index) * 25.0 + skyline_rng.randf_range(-3.0, 3.0)
+			var height := skyline_rng.randf_range(25.0, 60.0)
+			_add_distant_building(skyline, x, z + skyline_rng.randf_range(-3.0, 3.0), skyline_rng.randf_range(16.0, 22.0), skyline_rng.randf_range(15.0, 20.0), height, wall_colors[index % wall_colors.size()], end_windows, false)
+	_add_distant_windows(skyline, "Distant Side Windows", side_windows, Vector3(0.12, 1.5, 2.2))
+	_add_distant_windows(skyline, "Distant End Windows", end_windows, Vector3(2.2, 1.5, 0.12))
+
+
+func _add_distant_building(parent: Node3D, x: float, z: float, width: float, depth: float, height: float, wall_color: Color, windows: Array[Transform3D], side_facing: bool) -> void:
+	var building := Node3D.new()
+	building.name = "Distant Building"
+	building.position = Vector3(x, 0.0, z)
+	parent.add_child(building)
+	_city_box(building, Vector3(0.0, STREET_SURFACE_Y + height * 0.5, 0.0), Vector3(width, height, depth), wall_color)
+	_city_box(building, Vector3(0.0, STREET_SURFACE_Y + height + 0.12, 0.0), Vector3(width + 0.5, 0.24, depth + 0.5), Color("9baabd"))
+	var floor_count := clampi(floori(height / 9.0), 3, 7)
+	for floor_number in range(1, floor_count):
+		var window_y := STREET_SURFACE_Y + height * float(floor_number) / float(floor_count)
+		for column in 2:
+			if (floor_number + column + floori(absf(x)) + floori(absf(z))) % 5 == 0:
+				continue
+			var window_position: Vector3
+			if side_facing:
+				window_position = Vector3(-signf(x) * (width * 0.5 + 0.06) + x, window_y, z + (float(column) - 0.5) * depth * 0.45)
+			else:
+				window_position = Vector3(x + (float(column) - 0.5) * width * 0.45, window_y, z - signf(z) * (depth * 0.5 + 0.06))
+			windows.append(Transform3D(Basis(), window_position))
+
+
+func _add_distant_windows(parent: Node3D, window_name: String, positions: Array[Transform3D], size: Vector3) -> void:
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	var instances := MultiMesh.new()
+	instances.transform_format = MultiMesh.TRANSFORM_3D
+	instances.mesh = mesh
+	instances.instance_count = positions.size()
+	for index in positions.size():
+		instances.set_instance_transform(index, positions[index])
+	var windows := MultiMeshInstance3D.new()
+	windows.name = window_name
+	windows.multimesh = instances
+	windows.material_override = _material(Color("d1b38c"), false, 1.3)
+	windows.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(windows)
 
 
 func _build_city_ground() -> void:
 	var ground := Node3D.new()
 	ground.name = "City Ground"
 	add_child(ground)
-	var street := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y - 0.5, CITY_GROUND_CENTER_Z), Vector3(78.0, 1.0, CITY_GROUND_LENGTH), Color("252a39"))
+	var outer_ground := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y - 1.2, CITY_GROUND_CENTER_Z), Vector3(CITY_GROUND_WIDTH, 1.0, CITY_GROUND_LENGTH), Color("343a4d"))
+	outer_ground.name = "Outer City Ground"
+	var street := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y - 0.5, CITY_GROUND_CENTER_Z), Vector3(STREET_WIDTH, 1.0, CITY_GROUND_LENGTH), Color("252a39"))
 	street.name = "Asphalt Street"
-	var street_snow := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y + GROUND_SNOW_THICKNESS * 0.5, CITY_GROUND_CENTER_Z), Vector3(77.5, GROUND_SNOW_THICKNESS, CITY_GROUND_LENGTH - 0.5), Color("c5d1dc"))
+	var street_snow := _city_box(ground, Vector3(0.0, STREET_SURFACE_Y + GROUND_SNOW_THICKNESS * 0.5, CITY_GROUND_CENTER_Z), Vector3(STREET_WIDTH - 0.5, GROUND_SNOW_THICKNESS, CITY_GROUND_LENGTH - 0.5), Color("c5d1dc"))
 	street_snow.name = "Street Snow"
 	for side_index in 2:
 		var side := -1.0 if side_index == 0 else 1.0
-		var sidewalk := _city_box(ground, Vector3(side * 42.0, -12.25, CITY_GROUND_CENTER_Z), Vector3(8.0, 1.5, CITY_GROUND_LENGTH), Color("51566b"))
+		var sidewalk := _city_box(ground, Vector3(side * SIDEWALK_CENTER_X, STREET_SURFACE_Y - 0.25, CITY_GROUND_CENTER_Z), Vector3(SIDEWALK_WIDTH, 1.5, CITY_GROUND_LENGTH), Color("51566b"))
 		sidewalk.name = "Sidewalk %d" % side_index
 		var sidewalk_top := sidewalk.position.y + (sidewalk.mesh as BoxMesh).size.y * 0.5
-		var sidewalk_snow := _city_box(ground, Vector3(side * 42.0, sidewalk_top + GROUND_SNOW_THICKNESS * 0.5, CITY_GROUND_CENTER_Z), Vector3(7.8, GROUND_SNOW_THICKNESS, CITY_GROUND_LENGTH - 0.5), Color("d6e0e8"))
+		var sidewalk_snow := _city_box(ground, Vector3(side * SIDEWALK_CENTER_X, sidewalk_top + GROUND_SNOW_THICKNESS * 0.5, CITY_GROUND_CENTER_Z), Vector3(SIDEWALK_WIDTH - 0.2, GROUND_SNOW_THICKNESS, CITY_GROUND_LENGTH - 0.5), Color("d6e0e8"))
 		sidewalk_snow.name = "Sidewalk Snow %d" % side_index
-		_city_box(ground, Vector3(side * 38.0, -11.7, CITY_GROUND_CENTER_Z), Vector3(0.6, 0.3, CITY_GROUND_LENGTH), Color("9a9bae"))
-		for index in 40:
-			var z := 49.0 - index * 18.0
-			_city_box(ground, Vector3(side * 13.0, STREET_SURFACE_Y + GROUND_SNOW_THICKNESS + 0.01, z), Vector3(0.35, 0.02, 7.0), Color("d4b77b"), true)
+		_city_box(ground, Vector3(side * (STREET_WIDTH * 0.5 + 0.15), STREET_SURFACE_Y + GROUND_SNOW_THICKNESS + 0.25, CITY_GROUND_CENTER_Z), Vector3(0.3, 0.5, CITY_GROUND_LENGTH), Color("9a9bae"))
+		for index in range(-12, 66):
+			var z := 49.0 - float(index) * 18.0
+			_city_box(ground, Vector3(side * (TRAFFIC_LANE_X - 4.0), STREET_SURFACE_Y + GROUND_SNOW_THICKNESS + 0.01, z), Vector3(0.35, 0.02, 7.0), Color("d4b77b"), true)
 
 
 func _build_street_lights() -> void:
 	var lamps := Node3D.new()
 	lamps.name = "Street Lights"
 	add_child(lamps)
-	for index in 15:
-		var z := 30.0 - index * 48.0
+	for index in range(-4, 25):
+		var z := 30.0 - float(index) * 48.0
 		for side in [-1.0, 1.0]:
 			var lamp := Node3D.new()
-			lamp.position = Vector3(side * 35.5, -11.8, z)
+			lamp.position = Vector3(side * SIDEWALK_CENTER_X, SIDEWALK_SURFACE_Y, z)
 			lamps.add_child(lamp)
 			_city_box(lamp, Vector3(0.0, 2.8, 0.0), Vector3(0.18, 5.6, 0.18), Color("4a4b5c"))
 			_city_box(lamp, Vector3(-side * 0.65, 5.55, 0.0), Vector3(1.3, 0.13, 0.13), Color("4a4b5c"))
@@ -1156,7 +1231,7 @@ func _build_traffic() -> void:
 	for index in TRAFFIC_SPAWN_Z.size():
 		var direction := 1.0 if index % 2 == 0 else -1.0
 		var car := Node3D.new()
-		car.position = Vector3(-17.0 if direction > 0.0 else 17.0, -11.65, TRAFFIC_SPAWN_Z[index])
+		car.position = Vector3(-TRAFFIC_LANE_X if direction > 0.0 else TRAFFIC_LANE_X, -11.65, TRAFFIC_SPAWN_Z[index])
 		traffic.add_child(car)
 		_city_box(car, Vector3(0.0, 0.22, 0.0), Vector3(2.2, 0.55, 3.5), Color("252a36"))
 		for side in [-1.0, 1.0]:

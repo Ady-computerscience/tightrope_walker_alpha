@@ -530,11 +530,52 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: cityscape background was not built")
 		quit(1)
 		return true
+	var distant_skyline := cityscape.get_node_or_null("Distant Skyline")
+	if distant_skyline == null or distant_skyline.get_child_count() < 300:
+		printerr("FAIL: distant skyline was not built around the city")
+		quit(1)
+		return true
+	var side_windows := distant_skyline.get_node_or_null("Distant Side Windows") as MultiMeshInstance3D
+	var end_windows := distant_skyline.get_node_or_null("Distant End Windows") as MultiMeshInstance3D
+	if side_windows == null or end_windows == null or side_windows.multimesh.instance_count < 500 or end_windows.multimesh.instance_count < 50:
+		printerr("FAIL: distant building rows are missing their facade windows")
+		quit(1)
+		return true
+	var skyline_min := Vector2(INF, INF)
+	var skyline_max := Vector2(-INF, -INF)
+	for building in distant_skyline.get_children():
+		skyline_min = skyline_min.min(Vector2(building.position.x, building.position.z))
+		skyline_max = skyline_max.max(Vector2(building.position.x, building.position.z))
+	if skyline_min.x > -200.0 or skyline_max.x < 200.0 or skyline_min.y > -1000.0 or skyline_max.y < 200.0:
+		printerr("FAIL: skyline did not extend behind, ahead, and to both sides of the course")
+		quit(1)
+		return true
 	var city_ground := game.get_node_or_null("City Ground")
 	if city_ground == null or city_ground.get_node_or_null("Asphalt Street") == null or city_ground.get_child_count() < 50:
 		printerr("FAIL: city street and sidewalks were not built")
 		quit(1)
 		return true
+	var outer_ground := city_ground.get_node_or_null("Outer City Ground") as MeshInstance3D
+	if outer_ground == null or (outer_ground.mesh as BoxMesh).size.x < 450.0 or (outer_ground.mesh as BoxMesh).size.z < 1400.0:
+		printerr("FAIL: ground did not extend beneath the distant skyline")
+		quit(1)
+		return true
+	var street := city_ground.get_node("Asphalt Street") as MeshInstance3D
+	var street_width: float = (street.mesh as BoxMesh).size.x
+	if street_width >= 60.0:
+		printerr("FAIL: the street was not narrowed")
+		quit(1)
+		return true
+	var sidewalk_surface_y := 0.0
+	for side_index in 2:
+		var sidewalk := city_ground.get_node("Sidewalk %d" % side_index) as MeshInstance3D
+		var sidewalk_snow := city_ground.get_node("Sidewalk Snow %d" % side_index) as MeshInstance3D
+		var sidewalk_width: float = (sidewalk.mesh as BoxMesh).size.x
+		if not is_equal_approx(absf(sidewalk.position.x) - sidewalk_width * 0.5, street_width * 0.5) or not is_equal_approx(sidewalk_snow.position.x, sidewalk.position.x):
+			printerr("FAIL: sidewalk %d does not border the street" % side_index)
+			quit(1)
+			return true
+		sidewalk_surface_y = sidewalk_snow.position.y + (sidewalk_snow.mesh as BoxMesh).size.y * 0.5
 	var street_lights := game.get_node_or_null("Street Lights")
 	var traffic := game.get_node_or_null("Street Traffic")
 	var cars: Array = game.get("traffic_lights")
@@ -542,6 +583,16 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: street lights or traffic were not built")
 		quit(1)
 		return true
+	for lamp in street_lights.get_children():
+		if not is_equal_approx(absf(lamp.position.x), absf((city_ground.get_node("Sidewalk 0") as MeshInstance3D).position.x)) or not is_equal_approx(lamp.position.y, sidewalk_surface_y):
+			printerr("FAIL: a streetlamp is not standing on a sidewalk")
+			quit(1)
+			return true
+	for car in cars:
+		if absf(car.position.x) + 1.1 >= street_width * 0.5:
+			printerr("FAIL: traffic no longer fits within the narrowed street")
+			quit(1)
+			return true
 	var first_car_z: float = cars[0].position.z
 	game.call("_update_traffic", 0.25)
 	if cars[0].position.z <= first_car_z:
