@@ -44,7 +44,7 @@ func _process(_delta: float) -> bool:
 	bird_rules.bird_dirs = [-1, 1, -1]
 	game.call("_update_birds")
 	var center_bird: Node3D = bird_models[1]
-	var hover_position: Vector3 = game.get("walker").position + Vector3(0.0, 2.0, -5.0)
+	var hover_position: Vector3 = game.get("walker").position + Vector3(0.0, 3.5, -5.0)
 	var camera: Camera3D = game.get("camera")
 	var entry_offset := center_bird.position - hover_position
 	if entry_offset.dot(camera.global_transform.basis.x) < 23.0 or entry_offset.dot(camera.global_transform.basis.y) < 12.0 or not is_equal_approx(-center_bird.transform.basis.z.normalized().x, -1.0):
@@ -77,8 +77,51 @@ func _process(_delta: float) -> bool:
 			printerr("FAIL: bird model does not face its assigned left/right direction")
 			quit(1)
 			return true
+	var saved_camera_transform := camera.global_transform
+	camera.position = game.get("walker").position + Vector3(7.0, 6.5, 15.0)
+	camera.look_at(game.get("walker").position + Vector3(0.0, 1.0, -12.0))
+	var bird_hud: GameHUD = game.get("hud")
+	var timer_track: Panel = bird_hud.get("_bird_timer_track")
+	var timer_fill: Panel = bird_hud.get("_bird_timer_fill")
+	game.call("_update_bird_timer")
+	var projected_bird := camera.unproject_position(center_bird.global_position)
+	var projected_left := camera.unproject_position(bird_models[0].global_position)
+	var projected_right := camera.unproject_position(bird_models[2].global_position)
+	var projected_walker := camera.unproject_position(game.get("walker").global_position + Vector3(0.0, 1.15, 0.0))
+	var expected_width := absf(projected_right.x - projected_left.x) * 0.5
+	var projected_center_x := (projected_left.x + projected_right.x) * 0.5
+	var timer_style := timer_track.get_theme_stylebox("panel") as StyleBoxFlat
+	var fill_style := timer_fill.get_theme_stylebox("panel") as StyleBoxFlat
+	if not timer_track.visible or timer_track.position.y <= projected_bird.y or timer_track.position.y > projected_bird.y + 8.0 or timer_track.position.y + timer_track.size.y >= projected_walker.y or not is_equal_approx(timer_track.size.x, expected_width) or not is_equal_approx(timer_track.position.x + timer_track.size.x * 0.5, projected_center_x) or not is_equal_approx(timer_fill.size.x, expected_width) or timer_track.size.y != 4.0 or timer_fill.size.y != 4.0 or timer_style == null or timer_style.border_width_left != 0 or timer_style.corner_radius_top_left != 2 or fill_style == null or fill_style.corner_radius_top_left != 2:
+		printerr("FAIL: borderless bird countdown is not centered at half the flock width")
+		quit(1)
+		return true
+	bird_rules.bird_timer = Rules.BIRD_WARN * 0.5
+	game.call("_update_bird_timer")
+	if not is_equal_approx(timer_fill.size.x, expected_width * 0.5) or fill_style.bg_color != GameHUD.GOLD:
+		printerr("FAIL: bird countdown did not shrink at half time")
+		quit(1)
+		return true
+	bird_rules.bird_timer = Rules.BIRD_WARN * 0.25
+	game.call("_update_bird_timer")
+	if not is_equal_approx(timer_fill.size.x, expected_width * 0.25) or fill_style.bg_color != GameHUD.WARNING_RED:
+		printerr("FAIL: bird countdown did not turn red at 75 percent elapsed")
+		quit(1)
+		return true
+	bird_rules.bird_timer = 0.0
+	game.call("_update_bird_timer")
+	if timer_track.visible:
+		printerr("FAIL: bird countdown remained visible when time ran out")
+		quit(1)
+		return true
 	bird_rules.bird_phase = "rest"
 	game.call("_update_birds")
+	game.call("_update_bird_timer")
+	camera.global_transform = saved_camera_transform
+	if timer_track.visible:
+		printerr("FAIL: bird countdown remained visible after the warning")
+		quit(1)
+		return true
 	for bird in bird_models:
 		if bird.visible:
 			printerr("FAIL: bird model remained visible after the warning")

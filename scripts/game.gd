@@ -18,6 +18,8 @@ const ROPE_COLOR := Color("ecd6ac")
 const HOT_COLOR := Color("ff5c46")
 const POLE_WAIST_Y := 1.15
 const POLE_FRONT_Z := -0.42
+const BIRD_HOVER_HEIGHT := 3.5
+const BIRD_TIMER_GAP_PIXELS := 5.0
 const STORIES := [
 	"The skyline waits ahead. Find your balance and take the first step.",
 	"Even the birds doubt you. Let them watch you prove them wrong.",
@@ -134,6 +136,7 @@ func _process(delta: float) -> void:
 	_update_birds()
 	_update_ropes()
 	_update_camera(dt)
+	_update_bird_timer()
 	snow.position = camera.position + Vector3(0.0, 16.0, -18.0)
 	_update_hud()
 
@@ -193,6 +196,7 @@ func _restart() -> void:
 	fall_elapsed = 0.0
 	hud.set_paused(false)
 	hud.hide_win()
+	hud.hide_bird_timer()
 	hud.show_caption("")
 	hud.show_control_hint()
 	_announce_tower()
@@ -267,7 +271,7 @@ func _update_birds() -> void:
 		var bird := birds[index]
 		bird.visible = active
 		if active:
-			var hover_position := walker.position + Vector3((index - 1) * 2.8, 2.0, -5.0)
+			var hover_position := walker.position + Vector3((index - 1) * 2.8, BIRD_HOVER_HEIGHT, -5.0)
 			if rules.bird_phase == "approach":
 				var entry_position := hover_position + camera.global_transform.basis.x * (rules.bird_entry_side * 24.0) + camera.global_transform.basis.y * 13.0
 				var progress := 1.0 - clampf(rules.bird_timer / Rules.BIRD_APPROACH, 0.0, 1.0)
@@ -276,6 +280,25 @@ func _update_birds() -> void:
 			else:
 				bird.position = hover_position
 				bird.rotation.y = -PI * 0.5 * rules.bird_dirs[index]
+
+
+func _update_bird_timer() -> void:
+	if rules.stage_kind() != "Birds" or rules.bird_phase != "warn" or rules.state != "walking":
+		hud.hide_bird_timer()
+		return
+	var center_position := birds[1].global_position
+	if camera.is_position_behind(center_position):
+		hud.hide_bird_timer()
+		return
+	var screen_position := camera.unproject_position(center_position)
+	if not get_viewport().get_visible_rect().has_point(screen_position):
+		hud.hide_bird_timer()
+		return
+	var left_position := camera.unproject_position(birds[0].global_position)
+	var right_position := camera.unproject_position(birds[2].global_position)
+	var timer_position := Vector2((left_position.x + right_position.x) * 0.5, screen_position.y + BIRD_TIMER_GAP_PIXELS)
+	var timer_width := absf(right_position.x - left_position.x) * 0.5
+	hud.show_bird_timer(timer_position, timer_width, rules.bird_timer / Rules.BIRD_WARN)
 
 
 func _update_ropes() -> void:
