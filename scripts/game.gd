@@ -5,6 +5,10 @@ const Rules := preload("res://scripts/tightrope_rules.gd")
 const HudScene := preload("res://scripts/game_hud.gd")
 const BirdScene := preload("res://assets/actg/swamphen/australasian_swamphen.glb")
 const BIRD_FLY_ANIMATION := "australasian_swamphen_fly"
+const INTRO_DURATION := 9.2
+const INTRO_SKIP_DURATION := 0.65
+const INTRO_START_POSITION := Vector3(18.0, 64.0, -250.0)
+const INTRO_START_LOOK := Vector3(0.0, 52.0, -270.0)
 const FEET_Y := 45.0
 const ROPE_Y := 44.87
 const STATIC_SAG := 0.25
@@ -42,6 +46,9 @@ var last_step_foot := ""
 var has_taken_first_step := false
 var fall_elapsed := 0.0
 var intro_elapsed := 0.0
+var intro_skip_elapsed := 0.0
+var intro_skip_from_position := Vector3.ZERO
+var intro_skip_from_look := Vector3.ZERO
 var outro_elapsed := 0.0
 var mode := "intro"
 var paused := false
@@ -57,12 +64,17 @@ func _ready() -> void:
 	rules = Rules.new()
 	visual_z = Rules.step_z(1, 0)
 	_build_world()
+	_update_walker(0.0)
+	camera_position = INTRO_START_POSITION
+	camera_look = INTRO_START_LOOK
+	camera.position = camera_position
+	camera.look_at(camera_look)
 	hud = HudScene.new()
 	add_child(hud)
 	hud.replay_requested.connect(_restart)
 	hud.stargaze_requested.connect(_stargaze)
 	hud.pause_requested.connect(_toggle_pause)
-	hud.show_caption("Beyond the horizon, the stars gather every night.")
+	hud.show_caption("Beyond the horizon, the stars gather every night. Press Space to skip.")
 	hud.show_control_hint()
 
 
@@ -76,10 +88,12 @@ func _process(delta: float) -> void:
 		return
 	if mode == "intro":
 		intro_elapsed += dt
-		if _step_pressed() and intro_elapsed >= 2.0 or intro_elapsed >= 9.2:
-			mode = "walking"
-			hud.show_caption("")
-			_announce_tower()
+		if Input.is_action_just_pressed("skip_intro") or (_step_pressed() and intro_elapsed >= 2.0):
+			_start_intro_skip()
+		elif intro_elapsed >= INTRO_DURATION:
+			_finish_intro()
+	elif mode == "intro_skip":
+		intro_skip_elapsed += dt
 	elif mode == "outro":
 		outro_elapsed += dt
 		if _step_pressed() and outro_elapsed >= 2.0 or outro_elapsed >= 13.0:
@@ -151,6 +165,19 @@ func _step(foot: String = "") -> void:
 func _release() -> void:
 	if mode == "walking" and not paused and rules.release() == "released":
 		hud.show_toast("Tension released")
+
+
+func _start_intro_skip() -> void:
+	intro_skip_elapsed = 0.0
+	intro_skip_from_position = camera_position
+	intro_skip_from_look = camera_look
+	mode = "intro_skip"
+
+
+func _finish_intro() -> void:
+	mode = "walking"
+	hud.show_caption("")
+	_announce_tower()
 
 
 func _restart() -> void:
@@ -288,9 +315,19 @@ func _update_camera(dt: float) -> void:
 	var desired_position := focus + Vector3(7.0, 6.5, 15.0)
 	var desired_look := focus + Vector3(0.0, 1.0, -12.0)
 	if mode == "intro":
-		var progress := clampf(intro_elapsed / 9.2, 0.0, 1.0)
-		desired_position = Vector3(18.0, 64.0, -250.0).lerp(desired_position, progress)
-		desired_look = Vector3(0.0, 52.0, -270.0).lerp(desired_look, progress)
+		var progress := clampf(intro_elapsed / INTRO_DURATION, 0.0, 1.0)
+		desired_position = INTRO_START_POSITION.lerp(desired_position, progress)
+		desired_look = INTRO_START_LOOK.lerp(desired_look, progress)
+	elif mode == "intro_skip":
+		var progress := clampf(intro_skip_elapsed / INTRO_SKIP_DURATION, 0.0, 1.0)
+		var eased := smoothstep(0.0, 1.0, progress)
+		camera_position = intro_skip_from_position.lerp(desired_position, eased)
+		camera_look = intro_skip_from_look.lerp(desired_look, eased)
+		camera.position = camera_position
+		camera.look_at(camera_look)
+		if progress >= 1.0:
+			_finish_intro()
+		return
 	elif mode == "outro" or mode == "stargaze":
 		var progress := clampf(outro_elapsed / 13.0, 0.0, 1.0)
 		desired_position = focus.lerp(Vector3(0.0, 78.0, -260.0), progress)
@@ -575,6 +612,7 @@ func _install_input_actions() -> void:
 	_add_key("lean_right", KEY_P)
 	_add_key("step_left", KEY_W)
 	_add_key("step_right", KEY_O)
+	_add_key("skip_intro", KEY_SPACE)
 	_add_key("release", KEY_SPACE)
 	_add_key("release", KEY_E)
 	_add_key("pause_run", KEY_ESCAPE)

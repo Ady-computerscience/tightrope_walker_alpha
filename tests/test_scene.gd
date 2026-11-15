@@ -96,7 +96,28 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: startup control hint expired before the first step")
 		quit(1)
 		return true
-	game.set("mode", "walking")
+	if not _has_key_action("skip_intro", KEY_SPACE) or not _has_key_action("release", KEY_SPACE):
+		printerr("FAIL: Space is not mapped to intro skip and in-game release")
+		quit(1)
+		return true
+	var intro_camera_position := camera.position
+	var start_view_position: Vector3 = game.get("walker").position + Vector3(7.0, 6.5, 15.0)
+	game.call("_start_intro_skip")
+	if game.get("mode") != "intro_skip" or not camera.position.is_equal_approx(intro_camera_position):
+		printerr("FAIL: intro skip did not start from the current camera view")
+		quit(1)
+		return true
+	game.call("_process", 0.1)
+	if camera.position.is_equal_approx(intro_camera_position) or camera.position.is_equal_approx(start_view_position):
+		printerr("FAIL: intro skip camera did not pan through an intermediate view")
+		quit(1)
+		return true
+	for tick in 7:
+		game.call("_process", 0.1)
+	if game.get("mode") != "walking" or not camera.position.is_equal_approx(start_view_position) or game.get("rules").step != 0 or game.get("has_taken_first_step"):
+		printerr("FAIL: intro skip did not land at the start without taking a step")
+		quit(1)
+		return true
 	var startup_rules: TightropeRules = game.get("rules")
 	startup_rules.last_step_at = startup_rules.time
 	game.call("_step", "left")
