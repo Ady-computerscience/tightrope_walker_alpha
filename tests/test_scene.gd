@@ -298,8 +298,19 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	for tower in towers.get_children():
-		if tower.get_node_or_null("Walkable Roof") == null or tower.get_child_count() < 100:
+		var facade_body := tower.get_node_or_null("Facade") as MeshInstance3D
+		var roof := tower.get_node_or_null("Walkable Roof") as MeshInstance3D
+		if facade_body == null or roof == null or tower.get_child_count() < 100:
 			printerr("FAIL: skyscraper roof or facade detail is missing")
+			quit(1)
+			return true
+		var facade_mesh := facade_body.mesh as BoxMesh
+		var roof_mesh := roof.mesh as BoxMesh
+		var facade_top := facade_body.position.y + facade_mesh.size.y * 0.5
+		var roof_top := roof.position.y + roof_mesh.size.y * 0.5
+		var roof_bottom := roof.position.y - roof_mesh.size.y * 0.5
+		if facade_top >= roof_top - 0.1 or facade_top <= roof_bottom + 0.1:
+			printerr("FAIL: skyscraper facade top overlaps the visible roof top or leaves a gap")
 			quit(1)
 			return true
 	var cityscape := game.get_node_or_null("Cityscape")

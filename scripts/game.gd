@@ -581,7 +581,8 @@ func _build_rooftop_skyscrapers() -> void:
 	var facade_colors := [Color("303149"), Color("292d46"), Color("36364d"), Color("252942"), Color("303149")]
 	var glass_colors := [Color("a5bfd5"), Color("f7ca76"), Color("e8a96b"), Color("596c8c")]
 	var roof_y := FEET_Y - 0.5
-	var height := roof_y + 12.0
+	var roof_thickness := 0.4
+	var facade_height := roof_y + 12.0 - roof_thickness * 0.5
 	for number in range(1, Rules.TOWER_COUNT + 2):
 		var tower := Node3D.new()
 		tower.name = "Skyscraper %d" % number
@@ -589,8 +590,9 @@ func _build_rooftop_skyscrapers() -> void:
 		towers.add_child(tower)
 		var facade: Color = facade_colors[number - 1]
 		var trim := facade.lightened(0.25)
-		_city_box(tower, Vector3(0.0, -12.0 + height * 0.5, 0.0), Vector3(17.0, height, 20.0), facade)
-		var roof := _city_box(tower, Vector3(0.0, roof_y - 0.2, 0.0), Vector3(19.0, 0.4, 24.0), Color("55586c"))
+		var body := _city_box(tower, Vector3(0.0, -12.0 + facade_height * 0.5, 0.0), Vector3(17.0, facade_height, 20.0), facade)
+		body.name = "Facade"
+		var roof := _city_box(tower, Vector3(0.0, roof_y - roof_thickness * 0.5, 0.0), Vector3(19.0, roof_thickness, 24.0), Color("55586c"))
 		roof.name = "Walkable Roof"
 		for side in [-1.0, 1.0]:
 			_city_box(tower, Vector3(side * 9.2, roof_y + 0.45, 0.0), Vector3(0.5, 1.3, 24.0), trim)
