@@ -30,6 +30,11 @@ const POLE_WAIST_Y := 1.9
 const POLE_FRONT_Z := -0.45
 const POLE_HAND_SPACING := 0.65
 const BIRD_HOVER_HEIGHT := 3.5
+const BIRD_NIGHT_EMISSION := Color("c7d4ff")
+const BIRD_NIGHT_GLOW := 0.6
+const BIRD_MARKER_HEIGHT := 0.7
+const CENTER_BIRD_MARKER_COLOR := Color("ffca62")
+const FLANKER_MARKER_COLOR := Color("fff4e4")
 const BIRD_TIMER_GAP_PIXELS := 5.0
 const GUST_TIMER_GAP_PIXELS := 8.0
 const GUST_TIMER_WIDTH := 100.0
@@ -453,6 +458,52 @@ func _update_birds() -> void:
 			else:
 				bird.position = hover_position
 				bird.rotation.y = -PI * 0.5 * rules.bird_dirs[index]
+
+
+## The swamphen model is dark plumage. Give every surface a pale emission that the
+## atmosphere scales with darkness (off in daylight, full at night) so the birds
+## stay readable against the night sky without changing the minigame.
+func _brighten_bird_for_night(bird: Node3D) -> void:
+	for found in bird.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := found as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		for surface in mesh_instance.mesh.get_surface_count():
+			var source := mesh_instance.get_active_material(surface) as StandardMaterial3D
+			if source == null:
+				continue
+			var material := source.duplicate() as StandardMaterial3D
+			material.emission_enabled = true
+			material.emission = BIRD_NIGHT_EMISSION
+			material.emission_energy_multiplier = BIRD_NIGHT_GLOW * _lit_source_glow_factor
+			mesh_instance.set_surface_override_material(surface, material)
+			_emissive_materials.append({"material": material, "energy": BIRD_NIGHT_GLOW})
+
+
+## A flat arrowhead above each bird pointing the way the bird faces (local -Z), so
+## the direction reads by shape, not only by the model's pose or colour. The centre
+## bird's marker is larger and gold; the flankers' are smaller and cream.
+func _bird_direction_marker(is_center: bool) -> MeshInstance3D:
+	var size := 0.42 if is_center else 0.3
+	var mesh := ArrayMesh.new()
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([
+		Vector3(0.0, 0.0, -size * 1.3),
+		Vector3(0.0, size * 0.5, 0.0),
+		Vector3(0.0, -size * 0.5, 0.0),
+	])
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var marker := MeshInstance3D.new()
+	marker.name = "Direction Marker"
+	marker.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.albedo_color = CENTER_BIRD_MARKER_COLOR if is_center else FLANKER_MARKER_COLOR
+	marker.material_override = material
+	marker.position = Vector3(0.0, BIRD_MARKER_HEIGHT, 0.0)
+	return marker
 
 
 func _update_gust_visual() -> void:
@@ -893,6 +944,8 @@ func _build_world() -> void:
 		if bird_animation != null and bird_animation.has_animation(BIRD_FLY_ANIMATION):
 			bird_animation.get_animation(BIRD_FLY_ANIMATION).loop_mode = Animation.LOOP_LINEAR
 			bird_animation.play(BIRD_FLY_ANIMATION)
+		_brighten_bird_for_night(bird)
+		bird.add_child(_bird_direction_marker(bird_number == 1))
 		birds.append(bird)
 	snow = CPUParticles3D.new()
 	snow.amount = 300

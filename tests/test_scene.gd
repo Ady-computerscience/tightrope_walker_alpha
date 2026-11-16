@@ -173,6 +173,36 @@ func _process(_delta: float) -> bool:
 			printerr("FAIL: bird model does not face its assigned left/right direction")
 			quit(1)
 			return true
+	var marker_sizes: Array[float] = []
+	for index in bird_models.size():
+		var bird: Node3D = bird_models[index]
+		var marker := bird.get_node_or_null("Direction Marker") as MeshInstance3D
+		if marker == null or marker.mesh == null or marker.position.y <= 0.0 or (marker.material_override as StandardMaterial3D).shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED:
+			printerr("FAIL: bird %d is missing its unshaded direction marker" % index)
+			quit(1)
+			return true
+		var marker_aabb := marker.mesh.get_aabb()
+		if marker_aabb.position.z >= 0.0 or marker_aabb.end.z > 0.001 or marker_aabb.size.x > 0.001:
+			printerr("FAIL: bird %d direction marker does not point forward" % index)
+			quit(1)
+			return true
+		marker_sizes.append(marker_aabb.size.z)
+		var plumage := bird.find_children("*", "MeshInstance3D", true, false)
+		var glowing := false
+		for found in plumage:
+			var plumage_mesh := found as MeshInstance3D
+			if plumage_mesh == null or plumage_mesh == marker or plumage_mesh.mesh == null:
+				continue
+			var plumage_material := plumage_mesh.get_active_material(0) as StandardMaterial3D
+			glowing = glowing or (plumage_material != null and plumage_material.emission_enabled and emissive_materials.any(func(entry: Dictionary) -> bool: return entry["material"] == plumage_material))
+		if not glowing:
+			printerr("FAIL: bird %d plumage is not registered for night emission" % index)
+			quit(1)
+			return true
+	if marker_sizes[1] <= marker_sizes[0] or marker_sizes[1] <= marker_sizes[2]:
+		printerr("FAIL: centre bird marker is not larger than the flanker markers")
+		quit(1)
+		return true
 	var saved_camera_transform := camera.global_transform
 	camera.position = game.get("walker").position + Vector3(7.0, 6.5, 15.0)
 	camera.look_at(game.get("walker").position + Vector3(0.0, 1.0, -12.0))
