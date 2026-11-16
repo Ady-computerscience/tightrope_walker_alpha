@@ -18,6 +18,9 @@ const COUNTDOWN_BAR_HEIGHT := 4.0
 const TOP_BANNER_SIDE_MARGIN := 24.0
 const TOP_BANNER_TOP_MARGIN := 16.0
 const TOP_BANNER_HEIGHT := 174.0
+const TOP_BANNER_RIGHT := 390.0
+const TITLE_PANEL_WIDTH := 640.0
+const TITLE_BANNER_GAP := 16.0
 
 var _progress: Label
 var _stage: Label
@@ -51,6 +54,7 @@ var _title_tween: Tween
 
 func _ready() -> void:
 	_build()
+	get_viewport().size_changed.connect(_place_title)
 
 
 func show_status(tower: int, step: int, steps: int, kind: String, tilt: float, cue: String, tension: float = 0.0, run_seconds: float = 0.0) -> void:
@@ -165,6 +169,7 @@ func set_paused(value: bool) -> void:
 
 func show_title() -> void:
 	_title.visible = true
+	_place_title()
 	if _title_tween != null and _title_tween.is_running():
 		_title_tween.kill()
 	_title_prompt.modulate.a = 1.0
@@ -183,6 +188,18 @@ func is_title_visible() -> bool:
 	return _title.visible
 
 
+## Centre the title panel, but in a window too narrow for the panel and the status
+## banner to sit side by side, slide the panel right just enough to clear the banner.
+func _place_title() -> void:
+	if _title == null:
+		return
+	var viewport_width := get_viewport().get_visible_rect().size.x
+	var centred_left := (viewport_width - TITLE_PANEL_WIDTH) * 0.5
+	var shift := maxf(0.0, TOP_BANNER_RIGHT + TITLE_BANNER_GAP - centred_left)
+	_title.offset_left = shift
+	_title.offset_right = shift
+
+
 func _build() -> void:
 	var root := Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -193,7 +210,7 @@ func _build() -> void:
 	top.name = "Top Banner"
 	top.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	top.offset_left = TOP_BANNER_SIDE_MARGIN
-	top.offset_right = 390.0
+	top.offset_right = TOP_BANNER_RIGHT
 	top.offset_top = TOP_BANNER_TOP_MARGIN
 	top.offset_bottom = TOP_BANNER_TOP_MARGIN + TOP_BANNER_HEIGHT
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -385,7 +402,7 @@ func _build_title() -> PanelContainer:
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
-	panel.custom_minimum_size = Vector2(640, 0)
+	panel.custom_minimum_size = Vector2(TITLE_PANEL_WIDTH, 0)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_theme_stylebox_override("panel", _panel_style(26))
 	panel.visible = false
