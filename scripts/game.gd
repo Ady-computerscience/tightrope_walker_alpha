@@ -163,6 +163,7 @@ func _ready() -> void:
 	hud.replay_requested.connect(_restart)
 	hud.stargaze_requested.connect(_stargaze)
 	hud.pause_requested.connect(_toggle_pause)
+	hud.show_title()
 
 
 func _process(delta: float) -> void:
@@ -176,9 +177,11 @@ func _process(delta: float) -> void:
 	_update_red_beacons(delta)
 	if mode == "intro":
 		intro_elapsed += dt
+		# The title screen waits for the player. The camera pan finishes on its
+		# own and holds; Space (or a step key after two seconds) starts the run.
 		if Input.is_action_just_pressed("skip_intro") or (_step_pressed() and intro_elapsed >= 2.0):
 			_start_intro_skip()
-		elif intro_elapsed >= INTRO_DURATION:
+		elif intro_elapsed >= INTRO_DURATION and not hud.is_title_visible():
 			_finish_intro()
 	elif mode == "intro_skip":
 		intro_skip_elapsed += dt
@@ -284,6 +287,7 @@ func _release() -> void:
 
 
 func _start_intro_skip() -> void:
+	hud.hide_title()
 	intro_skip_elapsed = 0.0
 	intro_skip_from_position = camera_position
 	intro_skip_from_look = camera_look
@@ -291,11 +295,13 @@ func _start_intro_skip() -> void:
 
 
 func _finish_intro() -> void:
+	hud.hide_title()
 	mode = "walking"
 	_show_tower_title()
 
 
 func _restart() -> void:
+	hud.hide_title()
 	paused = false
 	mode = "walking"
 	rules = Rules.new()
