@@ -324,6 +324,17 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: opening text or control hint appeared")
 		quit(1)
 		return true
+	var title_screen: PanelContainer = hud.get("_title")
+	if title_screen == null or not title_screen.visible or not hud.call("is_title_visible"):
+		printerr("FAIL: title screen was not showing during the opening pan")
+		quit(1)
+		return true
+	game.set("intro_elapsed", 30.0)
+	game.call("_process", 0.1)
+	if game.get("mode") != "intro":
+		printerr("FAIL: the run started on its own while the title screen was waiting")
+		quit(1)
+		return true
 	if not _has_key_action("skip_intro", KEY_SPACE) or not _has_key_action("skip_fall", KEY_SPACE) or not _has_key_action("release", KEY_SPACE):
 		printerr("FAIL: Space is not mapped to intro skip, fall skip, and in-game release")
 		quit(1)
@@ -344,6 +355,10 @@ func _process(_delta: float) -> bool:
 		game.call("_process", 0.1)
 	if game.get("mode") != "walking" or not camera.position.is_equal_approx(start_view_position) or game.get("rules").step != 0 or game.get("has_taken_first_step"):
 		printerr("FAIL: intro skip did not land at the start without taking a step")
+		quit(1)
+		return true
+	if title_screen.visible:
+		printerr("FAIL: title screen stayed up after the run started")
 		quit(1)
 		return true
 	if opening_caption.visible or not opening_toast.visible or opening_toast.text != "TOWER 1: Wind" or opening_toast.get_theme_font_size("font_size") != 34 or opening_toast.horizontal_alignment != HORIZONTAL_ALIGNMENT_CENTER or opening_toast.offset_top <= GameHUD.TOP_BANNER_TOP_MARGIN + GameHUD.TOP_BANNER_HEIGHT:

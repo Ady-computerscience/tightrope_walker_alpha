@@ -44,6 +44,9 @@ var _win_text: Label
 var _paused: PanelContainer
 var _scrim: ColorRect
 var _tower_marks: Array[Panel] = []
+var _title: PanelContainer
+var _title_prompt: Label
+var _title_tween: Tween
 
 
 func _ready() -> void:
@@ -158,6 +161,26 @@ func hide_win() -> void:
 func set_paused(value: bool) -> void:
 	_paused.visible = value
 	_scrim.visible = value or _win.visible
+
+
+func show_title() -> void:
+	_title.visible = true
+	if _title_tween != null and _title_tween.is_running():
+		_title_tween.kill()
+	_title_prompt.modulate.a = 1.0
+	_title_tween = create_tween().set_loops()
+	_title_tween.tween_property(_title_prompt, "modulate:a", 0.3, 0.7).set_trans(Tween.TRANS_SINE)
+	_title_tween.tween_property(_title_prompt, "modulate:a", 1.0, 0.7).set_trans(Tween.TRANS_SINE)
+
+
+func hide_title() -> void:
+	if _title_tween != null and _title_tween.is_running():
+		_title_tween.kill()
+	_title.visible = false
+
+
+func is_title_visible() -> bool:
+	return _title.visible
 
 
 func _build() -> void:
@@ -298,6 +321,9 @@ func _build() -> void:
 	_toast.visible = false
 	root.add_child(_toast)
 
+	_title = _build_title()
+	root.add_child(_title)
+
 	_scrim = ColorRect.new()
 	_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_scrim.color = Color("0b0b19ad")
@@ -351,6 +377,81 @@ func _build() -> void:
 	pause_box.add_child(restart)
 	restart.pressed.connect(func() -> void: replay_requested.emit())
 	root.move_child(top, root.get_child_count() - 1)
+
+
+func _build_title() -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = "Title Screen"
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	panel.custom_minimum_size = Vector2(640, 0)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_theme_stylebox_override("panel", _panel_style(26))
+	panel.visible = false
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 8)
+	panel.add_child(box)
+
+	var eyebrow := _label("FOUR TOWERS  /  ONE NIGHT", 12, MINT)
+	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(eyebrow)
+	var title := _label("TIGHTROPE WALKER", 36, GOLD)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(title)
+	var subtitle := _label("Cross the rooftops without falling. Keep the pole level, and answer every interruption before it knocks you off.", 14, CREAM)
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(subtitle)
+	box.add_child(_title_spacer(6))
+
+	box.add_child(_label("CONTROLS", 11, MUTED))
+	var controls := GridContainer.new()
+	controls.columns = 2
+	controls.add_theme_constant_override("h_separation", 18)
+	controls.add_theme_constant_override("v_separation", 4)
+	box.add_child(controls)
+	_title_row(controls, "W / O", "Step with the left / right foot. Either order works.")
+	_title_row(controls, "Q / P", "Lean left / right. Small, early taps keep the pole level.")
+	_title_row(controls, "SPACE", "Release wire tension. During a fall, respawn at the last tower.")
+	_title_row(controls, "ESC  /  R", "Pause  /  restart the run.")
+	box.add_child(_title_spacer(6))
+
+	box.add_child(_label("INTERRUPTIONS", 11, MUTED))
+	var tasks := GridContainer.new()
+	tasks.columns = 2
+	tasks.add_theme_constant_override("h_separation", 18)
+	tasks.add_theme_constant_override("v_separation", 4)
+	box.add_child(tasks)
+	_title_row(tasks, "GUST WARNING", "A flag shows the side the gust comes from. Lean away from the flag within one second.")
+	_title_row(tasks, "FLANKER BIRDS", "Three birds fly in. Lean the way the centre bird points and ignore the outer two.")
+	_title_row(tasks, "WIRE TENSION", "The gauge climbs with time and steps. Press Space before the needle reaches red.")
+	_title_row(tasks, "SWAY", "The rope swings on the last crossing. Step when it is near the centre.")
+	box.add_child(_title_spacer(8))
+
+	_title_prompt = _label("PRESS SPACE TO START", 16, MINT)
+	_title_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(_title_prompt)
+	return panel
+
+
+func _title_row(grid: GridContainer, key: String, description: String) -> void:
+	var key_label := _label(key, 13, GOLD)
+	key_label.custom_minimum_size = Vector2(130, 0)
+	key_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	grid.add_child(key_label)
+	var text := _label(description, 13, CREAM)
+	text.custom_minimum_size = Vector2(430, 0)
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	grid.add_child(text)
+
+
+func _title_spacer(height: int) -> Control:
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, height)
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return spacer
 
 
 func _label(message: String, font_size: int, color: Color) -> Label:
