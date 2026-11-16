@@ -97,36 +97,23 @@ func _process(_delta: float) -> bool:
 		return true
 	game.call("_update_atmosphere", 2.0)
 	var low_moon: Vector3 = sky.get_shader_parameter("moon_direction")
-	if sky.get_shader_parameter("sky_mid_color") != Color("51427f"):
-		printerr("FAIL: the third crossing did not become dusk")
+	if sky.get_shader_parameter("sky_mid_color") != Color("0d1030") or sky.get_shader_parameter("sky_top_color") != Color("08091b"):
+		printerr("FAIL: the third crossing did not become night")
 		quit(1)
 		return true
-	game.set("visual_z", Rules.step_z(3, Rules.STEPS_PER_TOWER - 1))
-	game.call("_update_atmosphere", 0.0)
-	var before_fourth_tower: Vector3 = sky.get_shader_parameter("moon_direction")
-	atmosphere_rules.tower = 4
-	game.call("_update_atmosphere", 0.1)
-	if not (sky.get_shader_parameter("moon_direction") as Vector3).is_equal_approx(before_fourth_tower):
-		printerr("FAIL: the moon jumped when the last step toward tower four began")
-		quit(1)
-		return true
-	game.set("visual_z", Rules.step_z(3, Rules.STEPS_PER_TOWER))
-	game.call("_update_atmosphere", 0.0)
-	var rising_moon: Vector3 = sky.get_shader_parameter("moon_direction")
-	if rising_moon.y <= low_moon.y:
-		printerr("FAIL: the moon did not rise during the third crossing")
-		quit(1)
-		return true
-	game.call("_update_atmosphere", 2.0)
 	if not is_equal_approx(game.get("_lit_source_glow_factor"), 1.0) or not is_equal_approx(world_environment.glow_intensity, 0.85) or not is_equal_approx(lit_material.emission_energy_multiplier, float(emissive_materials[0]["energy"])) or not is_equal_approx(halo_material.albedo_color.a, (halo_materials[0]["color"] as Color).a) or not is_equal_approx(local_light.light_energy, float(local_lights[0]["energy"])):
 		printerr("FAIL: source glows did not return to full strength at night")
 		quit(1)
 		return true
-	game.set("visual_z", Rules.step_z(4, Rules.STEPS_PER_TOWER))
+	if low_moon.y <= 0.0 or float(sky.get_shader_parameter("moon_strength")) <= 0.5 or float(sky.get_shader_parameter("sun_strength")) > 0.01:
+		printerr("FAIL: night did not bring the moon up and put the sun away")
+		quit(1)
+		return true
+	game.set("visual_z", Rules.step_z(3, Rules.STEPS_PER_TOWER))
 	game.call("_update_atmosphere", 0.0)
 	var high_moon: Vector3 = sky.get_shader_parameter("moon_direction")
-	if sky.get_shader_parameter("sky_top_color") != Color("08091b") or high_moon.y <= rising_moon.y:
-		printerr("FAIL: the final crossing did not keep the night sky and rising moon")
+	if sky.get_shader_parameter("sky_top_color") != Color("08091b") or high_moon.y <= low_moon.y:
+		printerr("FAIL: the final crossing did not keep the night sky and raise the moon")
 		quit(1)
 		return true
 	atmosphere_rules.tower = 1
@@ -211,15 +198,15 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: bird countdown did not shrink at half time")
 		quit(1)
 		return true
-	bird_rules.tower = 4
+	bird_rules.tower = Rules.TOWER_COUNT
 	bird_rules.on_rope = true
 	game.call("_update_birds")
 	game.call("_update_reaction_timer")
 	game.call("_update_hud")
-	var stage_four_cue: Label = bird_hud.get("_cue")
-	var stage_four_gauge: PanelContainer = bird_hud.get("_wire_gauge_panel")
-	if not center_bird.visible or not timer_track.visible or not stage_four_gauge.visible or not stage_four_cue.text.begins_with("Center bird"):
-		printerr("FAIL: stage four does not show the birds, reaction timer, gauge, and bird cue together: bird=%s timer=%s gauge=%s cue=%s" % [center_bird.visible, timer_track.visible, stage_four_gauge.visible, stage_four_cue.text])
+	var final_stage_cue: Label = bird_hud.get("_cue")
+	var final_stage_gauge: PanelContainer = bird_hud.get("_wire_gauge_panel")
+	if not center_bird.visible or not timer_track.visible or not final_stage_gauge.visible or not final_stage_cue.text.begins_with("Center bird"):
+		printerr("FAIL: the final stage does not show the birds, reaction timer, gauge, and bird cue together: bird=%s timer=%s gauge=%s cue=%s" % [center_bird.visible, timer_track.visible, final_stage_gauge.visible, final_stage_cue.text])
 		quit(1)
 		return true
 	bird_rules.tower = 2
@@ -298,9 +285,9 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: wire tension gauge did not reveal and move its needle")
 		quit(1)
 		return true
-	hud.show_status(4, 0, Rules.STEPS_PER_TOWER, "Sway", 0.0, "Step near center", 0.0)
+	hud.show_status(Rules.TOWER_COUNT, 0, Rules.STEPS_PER_TOWER, "Tension", 0.0, "Keep the pole level", 0.0)
 	if not wire_gauge_panel.visible or not is_zero_approx(wire_gauge.tension):
-		printerr("FAIL: wire tension gauge disappeared or kept stale tension in stage four")
+		printerr("FAIL: wire tension gauge disappeared or kept stale tension on the final tower")
 		quit(1)
 		return true
 	hud.show_status(1, 0, Rules.STEPS_PER_TOWER, "Wind", 0.0, "Keep the pole level")
@@ -544,13 +531,10 @@ func _process(_delta: float) -> bool:
 		quit(1)
 		return true
 	var towers := game.get_node_or_null("Rooftop Skyscrapers")
-	if towers == null or towers.get_child_count() != 5:
-		printerr("FAIL: five rooftop skyscrapers were not built")
+	if towers == null or towers.get_child_count() != Rules.TOWER_COUNT + 1:
+		printerr("FAIL: four rooftop skyscrapers were not built")
 		quit(1)
 		return true
-	var fourth_walking_rope := Rules.rope_at(Rules.step_z(4, 4))
-	var fourth_loaded_midpoint: Vector3 = game.call("_rope_point", 4, 0.5, fourth_walking_rope)
-	var fourth_load_dip := float(game.call("_roof_anchor_point", 4).y) - fourth_loaded_midpoint.y
 	for tower in towers.get_children():
 		var facade_body := tower.get_node_or_null("Facade") as MeshInstance3D
 		var roof := tower.get_node_or_null("Walkable Roof") as MeshInstance3D
@@ -597,10 +581,6 @@ func _process(_delta: float) -> bool:
 			var loaded_dip := roof_anchor.y - loaded_midpoint.y
 			if not parked_rope.is_empty() or not is_equal_approx(parked_midpoint.y, roof_anchor.y) or loaded_dip <= 0.0:
 				printerr("FAIL: rope %d changed resting slack or lost its load dip" % tower_number)
-				quit(1)
-				return true
-			if tower_number <= 3 and loaded_dip <= fourth_load_dip + 0.35:
-				printerr("FAIL: rope %d does not dip farther under the stuntman than rope four" % tower_number)
 				quit(1)
 				return true
 			var near_edge_z := front_edge - 1.0
@@ -912,18 +892,18 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: wire countdown did not turn red in its final quarter")
 		quit(1)
 		return true
-	run.tower = 4
+	run.tower = Rules.TOWER_COUNT
 	game.call("_update_hud")
 	game.call("_update_reaction_timer")
 	if not wire_timer.visible or not (hud.get("_wire_gauge_panel") as PanelContainer).visible:
-		printerr("FAIL: wire countdown and gauge did not remain available in stage four")
+		printerr("FAIL: wire countdown and gauge did not remain available on the final stage")
 		quit(1)
 		return true
 	run.wind_phase = "react"
 	run.wind_timer = Rules.WIND_RESPONSE_TIME * 0.5
 	game.call("_update_reaction_timer")
 	if not wire_timer.visible:
-		printerr("FAIL: wind response displaced the stage-four wire countdown")
+		printerr("FAIL: wind response displaced the final-stage wire countdown")
 		quit(1)
 		return true
 	run.wind_phase = "rest"
