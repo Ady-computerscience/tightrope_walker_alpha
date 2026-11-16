@@ -25,7 +25,7 @@ Feet do not have to alternate on the keyboard. Balance and interruptions only be
 
 ### The course
 
-Four towers, three crossings of nine steps each. Reaching a tower sets a checkpoint and shows a `TOWER <n>: <STAGE>` title. The top banner shows the tower, step count, stage name, run timer and a cue line that tells you what to watch for. A Space prompt appears only when Space does something (release tension, or respawn after a fall). Each interruption ends with a `PASS` or `MISS` toast (`FAIL` when the wire snaps).
+Four towers, three crossings of thirteen steps each. Reaching a tower sets a checkpoint and shows a `TOWER <n>: <STAGE>` title. The top banner shows the tower, step count, stage name, run timer and a cue line that tells you what to watch for. A Space prompt appears only when Space does something (release tension, or respawn after a fall). Each interruption ends with a `PASS` or `MISS` toast (`FAIL` when the wire snaps).
 
 Balance is an inverted pendulum: the further you tilt, the faster you tip. Small, early corrections with **Q/P** keep the pole level. If the tilt reaches the limit you fall to the street; press **Space** (or wait) to respawn at the last tower you reached. Falls are counted.
 

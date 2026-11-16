@@ -70,12 +70,14 @@ func _test_steps_and_checkpoints() -> void:
 	_check(run.try_step() == "blocked" and not run.on_rope, "second step waits for the first step to reach the rope")
 	run.reach_rope()
 	_check(run.on_rope, "first completed step activates balance")
-	for index in 8:
+	for index in Rules.STEPS_PER_TOWER - 1:
 		run.time += 0.5
 		run.tilt = 0.0
 		var result := run.try_step()
-		if index == 7:
-			_check(result == "tower" and run.tower == 2 and run.step == 0, "nine steps reach tower two")
+		if index == Rules.STEPS_PER_TOWER - 2:
+			_check(result == "tower" and run.tower == 2 and run.step == 0, "%d steps reach tower two" % Rules.STEPS_PER_TOWER)
+		else:
+			_check(result == "ok" and run.tower == 1, "step %d stays on the first rope" % (index + 2))
 	run.tower = 3
 	run.checkpoint_tower = 3
 	run.time += 0.5

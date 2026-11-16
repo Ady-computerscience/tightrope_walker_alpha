@@ -3,7 +3,7 @@ extends RefCounted
 ## Pure gameplay rules ported from TightropeRules.luau.
 
 const TOWER_COUNT := 3
-const STEPS_PER_TOWER := 9
+const STEPS_PER_TOWER := 13
 const TOWER_SPACING := 62.0
 const ROOFTOP_START_OFFSET := 15.0
 const ROOF_FRONT_EDGE_OFFSET := 16.0
@@ -34,7 +34,7 @@ const BIRD_GUST_IMPULSE := 1.2
 const INTERRUPTION_SAFE_PERIOD := 1.0
 const TENSION_RATE := 0.11
 const TENSION_COUNTDOWN_START := 0.8
-const TENSION_PER_STEP := 0.07
+const TENSION_PER_STEP := 0.05
 const TENSION_JITTER := 0.8
 const RELEASE_COOLDOWN := 0.5
 const STAGES := ["Wind", "Birds", "Tension"]
