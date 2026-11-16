@@ -352,6 +352,13 @@ func _process(_delta: float) -> bool:
 		printerr("FAIL: the run started on its own while the title screen was waiting")
 		quit(1)
 		return true
+	var title_banner: PanelContainer = hud.get_child(0).get_node("Top Banner")
+	var title_rect := title_screen.get_global_rect()
+	var banner_rect := title_banner.get_global_rect()
+	if not title_banner.visible or title_rect.intersects(banner_rect):
+		printerr("FAIL: the title screen overlaps the status banner (title x=%s, banner right=%s)" % [title_rect.position.x, banner_rect.end.x])
+		quit(1)
+		return true
 	if not _has_key_action("skip_intro", KEY_SPACE) or not _has_key_action("skip_fall", KEY_SPACE) or not _has_key_action("release", KEY_SPACE):
 		printerr("FAIL: Space is not mapped to intro skip, fall skip, and in-game release")
 		quit(1)
